@@ -1,0 +1,30 @@
+{
+  "name": "ml-paper-figure",
+  "version": "0.1.0",
+  "description": "Agent skill for publication-ready Figure 1 diagrams in ML papers: SVG, vector PDF and PNG with a render-and-critique loop.",
+  "keywords": [
+    "agent-skill",
+    "claude-code",
+    "skills",
+    "svg",
+    "figure",
+    "diagram",
+    "neurips",
+    "cvpr",
+    "latex"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JihuLee/ml-paper-figure.git"
+  },
+  "bin": {
+    "ml-paper-figure": "bin/install.js"
+  },
+  "files": [
+    "bin/",
+    ".claude/skills/ml-paper-figure/"
+  ],
+  "engines": {
+    "node": ">=14.14"
+  }
+}
