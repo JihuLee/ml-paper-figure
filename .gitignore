@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.debug.png
+*.preview.png
+!examples/**/round*/*.debug.png
+!examples/**/round*/*.preview.png
