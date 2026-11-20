@@ -10,6 +10,14 @@ Modes
   python render_svg.py fig.svg --check    lint only (no image files)
   python render_svg.py --list-backends    show detected renderers
 
+Math
+  Write math as $...$ inside an ordinary single-line <text> (e.g. <text ...>scores $S[i,v,p]$</text>). Before each run
+  the script typesets every $...$ segment with LaTeX (tex_math.py: latex -> dvisvgm glyph paths, in the paper's math
+  setup with --paper main.tex or --math cm|newtx|...) and writes the result back into the SVG: the source <text> is
+  kept, hidden, as data-tex="src", followed by a generated <g data-tex="out" class="tex-line"> holding the sans
+  segments and one <g class="tex-math"> per math segment on the same baseline. Edit the source <text>, never the
+  generated group. The exported PDF gets the real Type 1 math fonts (pdflatex snippets stamped with PyMuPDF).
+
 Review images
   fig.debug.png    figure + coordinate grid (user units) + numbered boxes around every issue (E1, W2 ...)
   fig.preview.png  figure at its printed size (target width at --preview-dpi) for a legibility check
@@ -20,13 +28,17 @@ Lint (exact geometry when Chromium is available, approximate otherwise)
   elements outside the canvas, text overflowing / crowding its box, overlapping labels,
   connectors running through modules or labels, crossing / overlapping connectors,
   arrowheads that float or dig into their target, near-misaligned boxes and baselines,
-  font sizes in printed points at the target paper width.
+  font sizes in printed points at the target paper width, math groups (one text box each; printed base and script
+  sizes, script >= 5pt), math baseline vs the adjacent sans text.
 
 Exit status: 0 = no errors (and no warnings with --strict), 1 = issues found, 2 = fatal (parse error, no renderer).
 """
 from __future__ import annotations
 
 import argparse
+import atexit
+import hashlib
+import html
 import json
 import math
 import os
@@ -44,6 +56,7 @@ try:  # shared Inter width table (used by the approximate geometry fallback)
     from svg_geom import text_width as _text_width
 except Exception:  # pragma: no cover
     _text_width = None
+import tex_math  # noqa: E402
 
 SVG_NS = "http://www.w3.org/2000/svg"
 
@@ -196,6 +209,9 @@ def static_lint(svg_path: Path):
             content = "".join(el.itertext())
             if EMOJI_RE.search(content):
                 issues.append(issue("warn", "emoji", f"text {content.strip()[:40]!r} contains emoji/dingbat glyphs; they render as bitmaps or tofu in PDF. Use the vector badges from svg-primitives.md"))
+            if el.get("data-tex") != "src" and tex_math.has_math(content):
+                issues.append(issue("error", "math-untypeset", f"text {content.strip()[:50]!r} has $...$ math that was not typeset "
+                                    "(see the 'math' note); never fake it with italic tspans"))
         for k, v in el.attrib.items():
             lk = local(k)
             if lk == "href":
@@ -349,7 +365,7 @@ JS_ANALYZE = r"""async (opt) => {
   // ---- shapes (filled geometry + <use>/<image>)
   const shapes = [];
   for (const el of svg.querySelectorAll('rect, circle, ellipse, polygon, path, use, image')) {
-    if (!shown(el)) continue;
+    if (!shown(el) || el.closest('.tex-math')) continue;
     const tag = el.tagName.toLowerCase();
     const cs = getComputedStyle(el);
     const geom = !(tag === 'use' || tag === 'image');
@@ -411,7 +427,23 @@ JS_ANALYZE = r"""async (opt) => {
     }
     if (!pts.length) continue;
     const box = bboxPts(pts);
-    texts.push({ el: t, box, fs: minFs * scaleOf(m), base, name: label(t), cx: (box.x0 + box.x1) / 2, cy: (box.y0 + box.y1) / 2, onEdge: t.matches('.on-edge') });
+    texts.push({ el: t, box, fs: minFs * scaleOf(m), base, name: label(t), cx: (box.x0 + box.x1) / 2, cy: (box.y0 + box.y1) / 2,
+      onEdge: t.matches('.on-edge'), line: t.closest('.tex-line') });
+  }
+  // ---- LaTeX math groups: one text box each (ink of the glyphs), base size and script size from the typesetter
+  const maths = [];
+  for (const g of svg.querySelectorAll('g.tex-math')) {
+    if (!shown(g)) continue;
+    const pm = matOf(g.parentElement), m = matOf(g); if (!pm || !m) continue;
+    let bb; try { bb = g.getBBox(); } catch (e) { continue; }
+    if (!(bb.width > 0 || bb.height > 0)) continue;
+    const box = bboxPts(corners(bb).map(([x, y]) => tp(m, x, y)));
+    const ps = scaleOf(pm), d = g.dataset;
+    const tex = (d.tex || '').replace(/\s+/g, ' ');
+    const T = { el: g, box, fs: parseFloat(d.size) * ps, script: parseFloat(d.scriptSize) * ps, base: tp(pm, parseFloat(d.x), parseFloat(d.y))[1],
+      name: 'math "$' + (tex.length > 34 ? tex.slice(0, 33) + '…' : tex) + '$"', cx: (box.x0 + box.x1) / 2, cy: (box.y0 + box.y1) / 2,
+      onEdge: g.matches('.on-edge') || !!g.closest('.on-edge'), line: g.closest('.tex-line'), math: true };
+    texts.push(T); maths.push(T);
   }
 
   // ---- connectors
@@ -444,8 +476,25 @@ JS_ANALYZE = r"""async (opt) => {
   // ---- printed font size
   for (const T of texts) {
     const p = T.fs * opt.targetPt / VW;
-    if (p < opt.errPt) add('error', 'font-too-small', `${T.name}: ${R(T.fs)}u = ${p.toFixed(1)}pt at ${opt.targetName} width (min ${opt.errPt}pt)`, T.box);
+    if (p < opt.errPt - 1e-6) add('error', 'font-too-small', `${T.name}: ${R(T.fs)}u = ${p.toFixed(1)}pt at ${opt.targetName} width (min ${opt.errPt}pt)`, T.box);
     else if (p < opt.minPt - 1e-6) add('warn', 'font-small', `${T.name}: ${R(T.fs)}u = ${p.toFixed(1)}pt at ${opt.targetName} width (want >= ${opt.minPt}pt)`, T.box);
+  }
+  const mathInfo = [];
+  for (const T of maths) {
+    const k = opt.targetPt / VW, p = T.fs * k, sp = T.script * k;
+    mathInfo.push({ tex: T.el.dataset.tex, pt: Math.round(p * 100) / 100, scriptPt: Math.round(sp * 100) / 100, hasScripts: /[_^]|\\(frac|sum|prod|int|lim|sqrt)/.test(T.el.dataset.tex || '') });
+    if (!mathInfo[mathInfo.length - 1].hasScripts) continue;
+    if (sp < opt.mathScriptErrPt - 0.01) add('error', 'math-script-too-small', `${T.name}: scripts print at ${sp.toFixed(2)}pt (min ${opt.mathScriptErrPt}pt). Raise the base size or declare larger script sizes (\\DeclareMathSizes); never shrink or fake scripts`, T.box);
+    else if (sp < opt.minPt - 0.01) add('warn', 'math-script-small', `${T.name}: scripts print at ${sp.toFixed(2)}pt (LaTeX script size for ${p.toFixed(1)}pt text; want >= ${opt.minPt}pt where space allows)`, T.box);
+  }
+  // math baseline = baseline of the sans text on the same line
+  for (const T of maths) {
+    if (!T.line) continue;
+    for (const U of texts) {
+      if (U.math || U.line !== T.line || U.base === null) continue;
+      const d = Math.abs(U.base - T.base) * opt.targetPt / VW;
+      if (d > 0.2) add('warn', 'math-baseline', `${T.name} sits ${d.toFixed(2)}pt off the baseline of ${U.name}`, union(T.box, U.box));
+    }
   }
 
   // ---- text inside its container
@@ -474,7 +523,7 @@ JS_ANALYZE = r"""async (opt) => {
   // ---- text vs text
   for (let i = 0; i < texts.length; i++) for (let j = i + 1; j < texts.length; j++) {
     const A = texts[i], B = texts[j];
-    if (A.el.contains(B.el) || B.el.contains(A.el)) continue;
+    if (A.el.contains(B.el) || B.el.contains(A.el) || (A.line && A.line === B.line)) continue;
     const I = isect(A.box, B.box);
     if (I.x1 - I.x0 > 0.3 && I.y1 - I.y0 > 0.3) add('error', 'text-overlap', `${A.name} overlaps ${B.name}`, union(A.box, B.box));
     else if (overlaps(grow(A.box, opt.textGap / 2), grow(B.box, opt.textGap / 2))) add('warn', 'text-crowded', `${A.name} and ${B.name} are less than ${opt.textGap}u apart`, union(A.box, B.box));
@@ -577,7 +626,30 @@ JS_ANALYZE = r"""async (opt) => {
 
   const sizes = [...new Set(texts.map(T => Math.round(T.fs * 2) / 2))].sort((a, b) => a - b);
   if (sizes.length > 5) add('warn', 'font-tiers', `${sizes.length} distinct font sizes (${sizes.join(', ')}u); use 3-5 tiers for a clear hierarchy`, null);
-  return { issues, stats: { vb: [VB.x0, VB.y0, VW, VH], nTexts: texts.length, nShapes: shapes.length, nEdges: edges.length, fontSizes: sizes } };
+  return { issues, stats: { vb: [VB.x0, VB.y0, VW, VH], nTexts: texts.length, nShapes: shapes.length, nEdges: edges.length, fontSizes: sizes, math: mathInfo } };
+}"""
+
+JS_MEASURE = r"""({ items }) => {
+  const svg = document.querySelector('body > svg');
+  const rootInv = svg.getScreenCTM().inverse();
+  const out = [];
+  for (const it of items) {
+    const t = svg.querySelector('[data-tm-i="' + it.i + '"]');
+    if (!t) { out.push(null); continue; }
+    const cs = getComputedStyle(t);
+    const widths = it.segs.map(s => {
+      const c = t.cloneNode(false);
+      for (const a of ['id', 'display', 'data-tm-i', 'data-tex', 'transform']) c.removeAttribute(a);
+      c.style.display = 'inline'; c.style.visibility = 'visible';
+      c.textContent = s; t.parentNode.insertBefore(c, t);
+      let w = 0; try { w = c.getComputedTextLength(); } catch (e) {}
+      c.remove(); return w; });
+    const p = t.parentNode, sm = p.getScreenCTM ? p.getScreenCTM() : null;
+    let scale = 1;
+    if (sm) { const m = rootInv.multiply(sm); scale = Math.sqrt(Math.abs(m.a * m.d - m.b * m.c)) || 1; }
+    out.push({ widths, fs: parseFloat(cs.fontSize), fill: cs.fill, anchor: cs.textAnchor, scale });
+  }
+  return out;
 }"""
 
 JS_OVERLAY = r"""({ issues, grid }) => {
@@ -620,25 +692,30 @@ try { ({ chromium } = require('playwright')); } catch (e) {
 const MOUNT = __MOUNT__;
 const ANALYZE = __ANALYZE__;
 const OVERLAY = __OVERLAY__;
+const MEASURE = __MEASURE__;
 const SKELETON = __SKELETON__;
 function tagIssues(issues) { const c = { error: 0, warn: 0, info: 0 };
   for (const it of issues) { c[it.sev] = (c[it.sev] || 0) + 1; it.tag = (it.sev === 'error' ? 'E' : it.sev === 'warn' ? 'W' : 'I') + c[it.sev]; } }
 (async () => {
   const cfg = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
   const svgText = fs.readFileSync(cfg.svg, 'utf8');
+  const pdfText = cfg.pdfSvg ? fs.readFileSync(cfg.pdfSvg, 'utf8') : svgText;
   const browser = await chromium.launch(cfg.executablePath ? { executablePath: cfg.executablePath } : {});
   const res = { files: {} };
-  const open = async (scale, w, h) => {
+  const open = async (scale, w, h, text) => {
     const ctx = await browser.newContext({ viewport: { width: Math.ceil(w), height: Math.ceil(h) }, deviceScaleFactor: scale });
     const page = await ctx.newPage();
     await page.setContent(SKELETON);
-    const err = await page.evaluate(MOUNT, { svgText, w, h });
+    const err = await page.evaluate(MOUNT, { svgText: text || svgText, w, h });
     if (err) throw new Error(err);
     await page.evaluate(() => document.fonts.ready.then(() => true));
     return { ctx, page };
   };
   try {
     const W = cfg.cssW, H = cfg.cssH, clip = { x: 0, y: 0, width: W, height: H };
+    if (cfg.measure) { const { ctx, page } = await open(1, W, H);
+      res.measure = await page.evaluate(MEASURE, { items: cfg.measure }); await ctx.close();
+      process.stdout.write(JSON.stringify(res)); return; }
     { const { ctx, page } = await open(cfg.pngScale || 1, W, H);
       if (cfg.analyze) res.analysis = await page.evaluate(ANALYZE, cfg.analyzeOpts);
       if (cfg.png) { await page.screenshot({ path: cfg.png, clip }); res.files.png = cfg.png; }
@@ -650,7 +727,7 @@ function tagIssues(issues) { const c = { error: 0, warn: 0, info: 0 };
     if (cfg.debug) { const { ctx, page } = await open(cfg.debugScale, W, H);
       await page.evaluate(OVERLAY, { issues, grid: cfg.grid });
       await page.screenshot({ path: cfg.debug, clip }); res.files.debug = cfg.debug; await ctx.close(); }
-    if (cfg.pdf) { const { ctx, page } = await open(1, cfg.pdfW, cfg.pdfH);
+    if (cfg.pdf) { const { ctx, page } = await open(1, cfg.pdfW, cfg.pdfH, pdfText);
       await page.addStyleTag({ content: `@page { size: ${cfg.pdfW}px ${cfg.pdfH}px; margin: 0 } html, body { width: ${cfg.pdfW}px; height: ${cfg.pdfH}px; overflow: hidden }` });
       await page.pdf({ path: cfg.pdf, width: cfg.pdfW + 'px', height: cfg.pdfH + 'px', printBackground: true, preferCSSPageSize: true,
         margin: { top: '0px', right: '0px', bottom: '0px', left: '0px' }, pageRanges: '1' });
@@ -696,10 +773,16 @@ def run_chromium(kind, cfg, svg_text):
     """Execute the Chromium job. Returns the result dict (raises RuntimeError on failure)."""
     if kind == "node":
         js = (NODE_DRIVER.replace("__MOUNT__", JS_MOUNT).replace("__ANALYZE__", JS_ANALYZE)
-              .replace("__OVERLAY__", JS_OVERLAY).replace("__SKELETON__", json.dumps(SKELETON)))
+              .replace("__OVERLAY__", JS_OVERLAY).replace("__MEASURE__", JS_MEASURE).replace("__SKELETON__", json.dumps(SKELETON)))
         with tempfile.TemporaryDirectory(prefix="mlfig_") as td:
             drv, cfgp = Path(td) / "driver.js", Path(td) / "cfg.json"
             drv.write_text(js, encoding="utf-8")
+            if cfg.get("pdfSvgText") is not None:
+                (Path(td) / "pdf.svg").write_text(cfg["pdfSvgText"], encoding="utf-8")
+                cfg = dict(cfg, pdfSvg=str(Path(td) / "pdf.svg"), pdfSvgText=None)
+            if cfg.get("svgText") is not None:
+                (Path(td) / "in.svg").write_text(cfg["svgText"], encoding="utf-8")
+                cfg = dict(cfg, svg=str(Path(td) / "in.svg"), svgText=None)
             cfgp.write_text(json.dumps(cfg), encoding="utf-8")
             r = run([shutil.which("node"), str(drv), str(cfgp)], timeout=300)
         if r.returncode != 0:
@@ -712,17 +795,22 @@ def run_chromium(kind, cfg, svg_text):
         kw = {"executable_path": cfg["executablePath"]} if cfg.get("executablePath") else {}
         browser = p.chromium.launch(**kw)
         try:
-            def open_(scale, w, h):
+            def open_(scale, w, h, text=None):
                 ctx = browser.new_context(viewport={"width": math.ceil(w), "height": math.ceil(h)}, device_scale_factor=scale)
                 page = ctx.new_page()
                 page.set_content(SKELETON)
-                err = page.evaluate(JS_MOUNT, {"svgText": svg_text, "w": w, "h": h})
+                err = page.evaluate(JS_MOUNT, {"svgText": text or svg_text, "w": w, "h": h})
                 if err:
                     raise RuntimeError(err)
                 page.evaluate("() => document.fonts.ready.then(() => true)")
                 return ctx, page
             W, H = cfg["cssW"], cfg["cssH"]
             clip = {"x": 0, "y": 0, "width": W, "height": H}
+            if cfg.get("measure"):
+                ctx, page = open_(1, W, H)
+                res["measure"] = page.evaluate(JS_MEASURE, {"items": cfg["measure"]})
+                ctx.close()
+                return res
             ctx, page = open_(cfg.get("pngScale") or 1, W, H)
             if cfg.get("analyze"):
                 res["analysis"] = page.evaluate(JS_ANALYZE, cfg["analyzeOpts"])
@@ -746,7 +834,7 @@ def run_chromium(kind, cfg, svg_text):
                 ctx.close()
             if cfg.get("pdf"):
                 pw, ph = cfg["pdfW"], cfg["pdfH"]
-                ctx, page = open_(1, pw, ph)
+                ctx, page = open_(1, pw, ph, cfg.get("pdfSvgText"))
                 page.add_style_tag(content=f"@page {{ size: {pw}px {ph}px; margin: 0 }} html, body {{ width: {pw}px; height: {ph}px; overflow: hidden }}")
                 page.pdf(path=cfg["pdf"], width=f"{pw}px", height=f"{ph}px", print_background=True, prefer_css_page_size=True,
                          margin={"top": "0px", "right": "0px", "bottom": "0px", "left": "0px"}, page_ranges="1")
@@ -950,6 +1038,19 @@ def approx_geometry(root, vb, opt):
         st = style(el, inh)
         if st.get("display") == "none" or st.get("visibility") == "hidden":
             return
+        if el.get("data-tex") == "out":
+            st["__line"] = id(el)
+        if tg == "g" and "tex-math" in (el.get("class") or "").split():
+            try:
+                x, y = float(el.get("data-x")), float(el.get("data-y"))
+                wd, ht, dp = float(el.get("data-wd")), float(el.get("data-ht")), float(el.get("data-dp"))
+                b = box_of([(x, y - ht), (x + wd, y + dp)], M)
+                texts.append({"box": b, "fs": float(el.get("data-size")) * M.scale(), "line": st.get("__line"),
+                              "name": f'math "${(el.get("data-tex") or "")[:34]}$"',
+                              "script": float(el.get("data-script-size")) * M.scale() if re.search(r"[_^]", el.get("data-tex") or "") else None})
+            except (TypeError, ValueError):
+                pass
+            return
         M = M * parse_transform(el.get("transform"))
         filled = (st.get("fill", "black") or "black").lower() not in ("none", "transparent") and fnum(st.get("fill-opacity", 1), 1) > 0.04
         name = tg + (f"#{el.get('id')}" if el.get("id") else "")
@@ -1034,7 +1135,8 @@ def approx_geometry(root, vb, opt):
                     minf = min(minf, f_)
             if pts:
                 b = box_of(pts, M)
-                texts.append({"box": b, "fs": minf * M.scale(), "name": f'text{"#" + el.get("id") if el.get("id") else ""} "{content[:36]}"'})
+                texts.append({"box": b, "fs": minf * M.scale(), "line": st.get("__line"),
+                              "name": f'text{"#" + el.get("id") if el.get("id") else ""} "{content[:36]}"'})
             return
         for ch in el:
             if isinstance(ch.tag, str):
@@ -1065,6 +1167,12 @@ def approx_geometry(root, vb, opt):
             issues.append(issue("error", "font-too-small", f"{t['name']}: {r1(t['fs'])}u = {p:.1f}pt at {opt['targetName']} width", t["box"]))
         elif p < opt["minPt"] - 1e-6:
             issues.append(issue("warn", "font-small", f"{t['name']}: {r1(t['fs'])}u = {p:.1f}pt at {opt['targetName']} width (want >= {opt['minPt']}pt)", t["box"]))
+        if t.get("script"):
+            sp = t["script"] * tgt
+            if sp < opt["mathScriptErrPt"] - 0.01:
+                issues.append(issue("error", "math-script-too-small", f"{t['name']}: scripts print at {sp:.2f}pt (min {opt['mathScriptErrPt']}pt)", t["box"]))
+            elif sp < opt["minPt"] - 0.01:
+                issues.append(issue("warn", "math-script-small", f"{t['name']}: scripts print at {sp:.2f}pt (want >= {opt['minPt']}pt where space allows)", t["box"]))
         b = t["box"]
         cx_, cy_ = (b[0] + b[2]) / 2, (b[1] + b[3]) / 2
         cands = sorted([s for s in shapes if s["box"][0] <= cx_ <= s["box"][2] and s["box"][1] <= cy_ <= s["box"][3] and area(s["box"]) > 1.15 * area(b)], key=lambda s: area(s["box"]))
@@ -1078,6 +1186,8 @@ def approx_geometry(root, vb, opt):
     for i in range(len(texts)):
         for j in range(i + 1, len(texts)):
             a, b = texts[i]["box"], texts[j]["box"]
+            if texts[i].get("line") and texts[i].get("line") == texts[j].get("line"):
+                continue
             if min(a[2], b[2]) - max(a[0], b[0]) > 0.3 and min(a[3], b[3]) - max(a[1], b[1]) > 0.3:
                 issues.append(issue("error", "text-overlap", f"{texts[i]['name']} overlaps {texts[j]['name']} (approx.)",
                                     [min(a[0], b[0]), min(a[1], b[1]), max(a[2], b[2]), max(a[3], b[3])]))
@@ -1127,8 +1237,10 @@ def pil_debug_overlay(png, out, issues, vb, scale, grid):
 
 
 def pdf_font_types(pdf):
-    """List of (name, type) from pdffonts, or None when pdffonts is unavailable."""
+    """List of (name, type) from pdffonts (PyMuPDF as fallback), or None when neither is available."""
     if not shutil.which("pdffonts"):
+        if tex_math.tex_env().get("pymupdf"):
+            return [(n, "Type 3" if t == "Type3" else t) for n, t in tex_math.pdf_fonts(pdf)]
         return None
     r = run(["pdffonts", pdf])
     out = []
@@ -1199,9 +1311,22 @@ def check_pdf(pdf, wpt, hpt, png, first_family):
         bad = [f["name"] for f in fonts if f["emb"] != "yes"]
         if bad:
             issues.append(issue("error", "pdf-font-not-embedded", f"fonts not embedded: {', '.join(bad)} (camera-ready checks will fail)"))
-        if any("Type 3" in f["type"] for f in fonts):
-            issues.append(issue("warn", "pdf-type3", "PDF contains Type 3 fonts; some camera-ready checkers flag them"))
+    elif tex_math.tex_env().get("pymupdf"):
+        fonts = [{"name": n, "type": "Type 3" if t == "Type3" else t, "emb": "?"} for n, t in tex_math.pdf_fonts(pdf)]
+    t3 = [f["name"] for f in fonts if "Type 3" in f["type"]]
+    if t3:
+        issues.append(issue("error", "pdf-type3", f"PDF contains Type 3 fonts ({', '.join(sorted(set(t3)))[:120]}); "
+                            "camera-ready checkers reject them. Use --pdf-text auto/outline, or a TrueType/Type 1 font"))
+    info["font_types"] = sorted({f"{re.sub(r'^[A-Z]{6}[+]', '', f['name'])} ({f['type']})" for f in fonts})
     info["fonts"] = sorted({re.sub(r"^[A-Z]{6}\+", "", f["name"]) for f in fonts})
+    if tex_math.tex_env().get("pymupdf"):
+        try:
+            sizes = {}
+            for font, size, _, _ in tex_math.pdf_text_spans(pdf):
+                sizes.setdefault(font, set()).add(round(size, 1))
+            info["text_sizes"] = {f: sorted(v) for f, v in sorted(sizes.items())}
+        except Exception:
+            pass
     if first_family and info["fonts"]:
         key = first_family.replace(" ", "").lower()
         if not any(key in f.replace(" ", "").lower() for f in info["fonts"]):
@@ -1227,6 +1352,339 @@ def check_pdf(pdf, wpt, hpt, png, first_family):
         except Exception as e:  # pragma: no cover
             info["png_pdf_diff"] = f"n/a ({e.__class__.__name__})"
     return issues, info
+
+
+# ----------------------------------------------------------------------------- LaTeX math typesetting
+
+TEXT_RE = re.compile(r"<text\b([^>]*?)(/?)>(.*?)</text>", re.S)
+OUT_RE = re.compile(r"[ \t]*<g data-tex=\"out\"[^>]*>.*?</g><!--/tex-->\n?", re.S)
+META_RE = re.compile(r"\s*<metadata id=\"tex-setup\"[^>]*>.*?</metadata>", re.S)
+MATH_RE = re.compile(r"<g class=\"tex-math\"[^>]*>.*?</g><!--/m-->", re.S)
+ATTR_RE = re.compile(r"""([:\w-]+)\s*=\s*("[^"]*"|'[^']*')""")
+
+
+def _attrs(s):
+    return [(k, v[1:-1]) for k, v in ATTR_RE.findall(s)]
+
+
+def _attr_str(pairs):
+    return "".join(f' {k}="{html.escape(v, quote=True)}"' for k, v in pairs)
+
+
+def _css_hex(c):
+    m = re.match(r"rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)", c or "")
+    if m:
+        return "".join(f"{int(v):02X}" for v in m.groups())
+    m = re.fullmatch(r"#([0-9a-fA-F]{6})", (c or "").strip())
+    if m:
+        return m.group(1).upper()
+    m = re.fullmatch(r"#([0-9a-fA-F]{3})", (c or "").strip())
+    if m:
+        return "".join(ch * 2 for ch in m.group(1)).upper()
+    return "000000"
+
+
+def _num(v, default=0.0):
+    try:
+        return float(re.sub(r"(px|pt)$", "", str(v).strip().split()[0].rstrip(",")))
+    except (TypeError, ValueError, IndexError):
+        return default
+
+
+def read_tex_setup(svg_text):
+    m = re.search(r"<metadata id=\"tex-setup\"([^>]*)>(.*?)</metadata>", svg_text, re.S)
+    if not m:
+        return None, {}
+    return html.unescape(m.group(2).strip()), dict(_attrs(m.group(1)))
+
+
+def _segments_for_measure(text):
+    """[(segment, is_math)] with whitespace collapsed; sans segment edges become no-break spaces (they are measured
+    and drawn as separate <text> elements, where plain edge spaces would collapse)."""
+    segs = tex_math.split_math(re.sub(r"\s+", " ", text).strip())
+    out = []
+    for t, m in segs:
+        if m:
+            out.append((t.strip(), True))
+        else:
+            lead, core, trail = re.match(r"^( ?)(.*?)( ?)$", t, re.S).groups()
+            out.append((" " * len(lead) + core + " " * len(trail), False))
+    return out
+
+
+def typeset_math(svg_path, svg_text, target_pt, VW, VH, chromium, chromium_path, a, notes, tex_issues):
+    """Typeset every $...$ in the SVG's <text> elements and write the result back. Returns the new SVG text.
+
+    Records problems in notes; raises nothing (the static lint then reports untypeset math as an error)."""
+    if a.no_typeset:
+        return svg_text
+    stored_pre, stored_meta = read_tex_setup(svg_text)
+    if a.paper or a.math:
+        try:
+            preamble, info = tex_math.paper_preamble(a.paper, a.math, not a.no_macros)
+        except tex_math.TexError as e:
+            notes.append(f"math: {e}")
+            return svg_text
+        paper_rel = os.path.relpath(info["paper"], svg_path.parent) if info["paper"] else ""
+        setup = {"data-paper": paper_rel, "data-math": info["math"] or "", "data-macros": str(info["macros"])}
+    elif stored_pre is not None:
+        preamble, setup = stored_pre, stored_meta
+    else:
+        preamble, _ = tex_math.paper_preamble(None, None)
+        setup = {"data-paper": "", "data-math": "cm (default)", "data-macros": "0"}
+    base = OUT_RE.sub("", svg_text)
+    sources = []
+    for m in TEXT_RE.finditer(base):
+        attrs, selfclose, inner = m.group(1), m.group(2), m.group(3)
+        if selfclose:
+            continue
+        is_src = 'data-tex="src"' in attrs
+        if "<" in inner:
+            if tex_math.has_math(re.sub(r"<[^>]+>", "", html.unescape(inner))):
+                notes.append("math: $...$ inside a <text> with <tspan> children is not typeset; put each line in its own "
+                             "<text> without tspans")
+            continue
+        content = html.unescape(inner)
+        if tex_math.has_math(content) or is_src:
+            sources.append((m, attrs, content, is_src))
+    if not sources:
+        return svg_text
+    k_print = target_pt / VW                      # printed pt per root user unit
+    def hash_of(attrs, content, r):     # source, target, TeX setup and the measured sans layout (fonts, sizes, widths)
+        lay = json.dumps([[round(w, 2) for w in r["widths"]], round(r["fs"], 3), r.get("fill"), r.get("anchor"), round(r["scale"], 4)])
+        return hashlib.sha1(f"{attrs}|{content}|{k_print:.6f}|{preamble}|{lay}".encode()).hexdigest()[:12]
+    old_hashes = re.findall(r'<g data-tex="out"[^>]*data-tex-hash="([0-9a-f]+)"', svg_text)
+    old_src = re.findall(r'<g data-tex="out"[^>]*data-tex-src="([0-9a-f]+)"', svg_text)
+    # measure the sans segments (exact with Chromium, Inter width table otherwise)
+    items, plan = [], []
+    for i, (m, attrs, content, is_src) in enumerate(sources):
+        if not tex_math.has_math(content):
+            plan.append(None)
+            continue
+        try:
+            segs = _segments_for_measure(content)
+        except tex_math.TexError as e:
+            notes.append(f"math: {e}")
+            plan.append(None)
+            continue
+        plan.append(segs)
+        items.append({"i": i, "segs": [t for t, mm in segs if not mm]})
+    tagged = base
+    for i, (m, attrs, content, is_src) in reversed(list(enumerate(sources))):
+        tagged = tagged[:m.start()] + f'<text data-tm-i="{i}"' + tagged[m.start() + 5:]
+    meas = {}
+    if chromium:
+        try:
+            cfg = {"svg": str(svg_path), "svgText": tagged, "cssW": VW, "cssH": VH, "measure": items,
+                   "executablePath": chromium_path}
+            res = run_chromium(chromium[0], cfg, tagged)
+            for it, r in zip(items, res.get("measure") or []):
+                if r:
+                    meas[it["i"]] = r
+        except Exception as e:
+            notes.append(f"math: chromium measurement failed ({str(e).splitlines()[-1][:160]}); using approximate widths")
+    snippets, layout = [], []
+    for i, (m, attrs, content, is_src) in enumerate(sources):
+        segs = plan[i]
+        if segs is None:
+            continue
+        pairs = [(k, v) for k, v in _attrs(attrs) if k not in ("data-tex", "display", "data-tm-i")]
+        ad = dict(pairs)
+        r = meas.get(i)
+        if r is None:      # approximate: attributes only
+            fs = _num(ad.get("font-size"), 16.0)
+            mm = re.search(r"font-size\s*:\s*([\d.]+)", ad.get("style", ""))
+            fs = float(mm.group(1)) if mm else fs
+            wt = ad.get("font-weight", 400)
+            widths = [(_text_width(t.replace(" ", " "), fs, wt) if _text_width else 0.58 * fs * len(t)) for t, mm_ in segs if not mm_]
+            r = {"widths": widths, "fs": fs, "fill": ad.get("fill", "#000000"), "anchor": ad.get("text-anchor", "start"), "scale": 1.0}
+            if not any("widths are approximate" in n for n in notes):
+                notes.append("math: sans segment widths are approximate (no Chromium); check the spacing visually")
+        p_bp = r["fs"] * r["scale"] * k_print            # printed size of the sans text (bp)
+        pt = round(p_bp, 3)                               # LaTeX size the snippet is compiled at (pt)
+        # local user units per bp of TeX output, scaled so that `pt` TeX points print at p_bp: the math base size equals
+        # the sans size and LaTeX's 5pt scripts print at 5pt
+        k_u = (1.0 / (r["scale"] * k_print)) * (p_bp / pt) * (72.27 / 72.0) if pt > 0 else 1.0
+        color = _css_hex(r.get("fill"))
+        idx = []
+        for t, ism in segs:
+            if ism:
+                idx.append(len(snippets))
+                snippets.append({"tex": t, "pt": pt, "color": color})
+        clean = re.sub(r'\s(data-tex|display)="[^"]*"', "", attrs)
+        h = hash_of(clean, content, r)
+        hs = hashlib.sha1(f"{clean}|{content}|{k_print:.6f}|{preamble}".encode()).hexdigest()[:12]
+        layout.append((i, pairs, segs, r, pt, k_u, color, idx, h, hs))
+    unhide = any(is_src and plan[i] is None for i, (_, _, _, is_src) in enumerate(sources))
+    if layout and not unhide and sorted(old_hashes) == sorted(L[-2] for L in layout):
+        return svg_text                          # up to date
+    if layout and not unhide and len(meas) < len(items) and sorted(old_src) == sorted(L[-1] for L in layout):
+        notes[:] = [n for n in notes if "widths are approximate" not in n]
+        notes.append("math: kept the existing typesetting (no Chromium to re-measure the sans text)")
+        return svg_text                          # sources unchanged; do not replace an exact layout by an approximate one
+    probs = tex_math.env_problems(tex_math.tex_env())
+    if probs and snippets:
+        if old_hashes:
+            tex_issues.append(issue("error", "math-stale", "a $...$ source, its font/size, the target width or the TeX setup changed "
+                                    "since the math was typeset, and it cannot be re-typeset here (" + probs[0] + ")"))
+        else:
+            notes.append("math: " + "; ".join(probs))
+        return svg_text
+    comp = None
+    if snippets:
+        try:
+            with tempfile.TemporaryDirectory(prefix="mlfig_tex_") as ttd:
+                comp = tex_math.compile_snippets(snippets, preamble, workdir=ttd, svg=True, pdf=False)
+        except tex_math.TexError as e:
+            notes.append(f"math: {e}")
+            return svg_text
+    outs = {}
+    for (i, pairs, segs, r, pt, k_u, color, idx, h, hs) in layout:
+        m, attrs, content, is_src = sources[i]
+        ad = dict(pairs)
+        x, y = _num(ad.get("x")), _num(ad.get("y"))
+        widths = iter(r["widths"])
+        mi = iter(idx)
+        pieces, total = [], 0.0
+        for t, ism in segs:
+            if ism:
+                j = next(mi)
+                wd, ht, dp = comp["metrics"][j]
+                pieces.append(("m", t, j, wd * k_u, ht * k_u, dp * k_u))
+                total += wd * k_u
+            else:
+                w = next(widths)
+                pieces.append(("t", t, w))
+                total += w
+        anchor = (r.get("anchor") or ad.get("text-anchor") or "start").strip()
+        cx = x - {"middle": total / 2, "end": total}.get(anchor, 0.0)
+        sc, _ = tex_math.effective_sizes(pt, preamble)
+        keep = [(k, v) for k, v in pairs if k not in ("id", "x", "y", "dx", "dy", "text-anchor", "transform", "textLength", "lengthAdjust")]
+        style = re.sub(r"text-anchor\s*:[^;]*;?", "", dict(keep).get("style", "")).strip().rstrip(";")
+        keep = [(k, v) for k, v in keep if k != "style"] + [("style", (style + ";" if style else "") + "text-anchor:start")]
+        parts = []
+        for pc in pieces:
+            if pc[0] == "t":
+                if pc[1].strip("  "):
+                    parts.append(f"<text{_attr_str(keep)} x=\"{cx:.2f}\" y=\"{y:g}\">{html.escape(pc[1], quote=False)}</text>")
+                cx += pc[2]
+            else:
+                _, t, j, wdu, htu, dpu = pc
+                parts.append(
+                    f'<g class="tex-math" data-tex="{html.escape(t, quote=True)}" data-pt="{pt:g}" data-script-pt="{sc:g}" '
+                    f'data-size="{r["fs"]:g}" data-script-size="{sc * 72 / 72.27 * k_u:.4f}" data-x="{cx:.3f}" data-y="{y:g}" '
+                    f'data-wd="{wdu:.3f}" data-ht="{htu:.3f}" data-dp="{dpu:.3f}" fill="#{color}" '
+                    f'transform="translate({cx:.3f} {y:g}) scale({k_u:.5f})">{comp["svgs"][j]}</g><!--/m-->')
+                cx += wdu
+        tr = ad.get("transform")
+        outs[i] = (f'<g data-tex="out" class="tex-line" data-tex-hash="{h}" data-tex-src="{hs}"' + (f' transform="{html.escape(tr, quote=True)}"' if tr else "")
+                   + ">" + "".join(parts) + "</g><!--/tex-->")
+    # rebuild: hide sources, insert outputs after them
+    new, pos = [], 0
+    for i, (m, attrs, content, is_src) in enumerate(sources):
+        new.append(base[pos:m.start()])
+        at = re.sub(r'\s(data-tex|display)="[^"]*"', "", attrs)
+        if i in outs:
+            new.append(f'<text{at} data-tex="src" display="none">{m.group(3)}</text>\n{outs[i]}')
+        else:
+            new.append(f"<text{at}>{m.group(3)}</text>")
+        pos = m.end()
+    new.append(base[pos:])
+    out = META_RE.sub("", "".join(new))
+    meta = (f'\n  <metadata id="tex-setup"{_attr_str(list(setup.items()))}>' + html.escape(preamble, quote=False) + "</metadata>")
+    mroot = re.search(r"<svg\b[^>]*>", out)
+    root_tag = mroot.group(0)
+    if "xlink:" in out[mroot.end():] and "xmlns:xlink" not in root_tag:     # PyMuPDF glyphs use xlink:href
+        root_tag = root_tag[:4] + ' xmlns:xlink="http://www.w3.org/1999/xlink"' + root_tag[4:]
+    out = out[:mroot.start()] + root_tag + meta + out[mroot.end():]
+    svg_path.write_text(out, encoding="utf-8")
+    notes.append(f"math: typeset {len(snippets)} snippet(s) in {len(outs)} line(s) "
+                 f"({setup.get('data-math') or 'cm'}, {setup.get('data-macros') or 0} paper macros) -> written into {svg_path.name}")
+    return out
+
+
+def math_placements(root, vb, target_pt):
+    """[(snippet, rect_pt or None)] for every visible g.tex-math, in document order (root user units -> PDF pt)."""
+    X0, Y0, W, _ = vb
+    k = target_pt / W
+    out = []
+
+    def walk(el, M, hidden):
+        tg = local(el.tag) if isinstance(el.tag, str) else ""
+        if tg in ("defs", "metadata", "style", "title", "desc"):
+            return
+        hidden = hidden or el.get("display") == "none" or el.get("visibility") == "hidden"
+        if tg == "g" and "tex-math" in (el.get("class") or "").split():
+            try:
+                x, y = float(el.get("data-x")), float(el.get("data-y"))
+                wd, ht, dp = float(el.get("data-wd")), float(el.get("data-ht")), float(el.get("data-dp"))
+                snip = {"tex": html.unescape(el.get("data-tex") or ""), "pt": float(el.get("data-pt")),
+                        "color": (el.get("fill") or "#000000").lstrip("#")}
+            except (TypeError, ValueError):
+                out.append((None, None, hidden))
+                return
+            ok = abs(M.b) < 1e-9 and abs(M.c) < 1e-9 and M.a > 0 and M.d > 0
+            if ok:
+                (ax, ay), (bx, by) = M.ap(x, y - ht), M.ap(x + wd, y + dp)
+                rect = ((ax - X0) * k, (ay - Y0) * k, (bx - X0) * k, (by - Y0) * k)
+            else:
+                rect = None
+            out.append((snip, rect, hidden))
+            return
+        M = M * parse_transform(el.get("transform"))
+        for ch in el:
+            if isinstance(ch.tag, str):
+                walk(ch, M, hidden)
+
+    walk(root, Mat(), False)
+    return out
+
+
+def prepare_math_pdf(svg_text, root, vb, target_pt, notes):
+    """(svg text for the PDF renderer, stamp job). Stampable math groups are removed from the PDF render and drawn
+    afterwards from pdflatex output with their real Type 1 fonts; the rest stay as glyph outlines."""
+    places = math_placements(root, vb, target_pt)
+    if not places:
+        return svg_text, None
+    env = tex_math.tex_env()
+    probs = tex_math.env_problems(env, need_pdf=True)
+    if probs:
+        notes.append("math in PDF: glyph outlines, no fonts (" + probs[-1].split(";")[0] + ")")
+        return svg_text, None
+    preamble, _ = read_tex_setup(svg_text)
+    keep_idx = []
+    jobs = []
+    for i, (snip, rect, hidden) in enumerate(places):
+        if hidden:
+            continue
+        if snip is None or rect is None:
+            keep_idx.append(i)
+            continue
+        jobs.append((i, snip, rect))
+    if any(p[1] is None and not p[2] for p in places):
+        notes.append("math in PDF: rotated/skewed math kept as glyph outlines")
+    if not jobs:
+        return svg_text, None
+    drop = {i for i, _, _ in jobs}
+    cnt = [-1]
+
+    def sub(mt):
+        cnt[0] += 1
+        return "" if cnt[0] in drop else mt.group(0)
+
+    return MATH_RE.sub(sub, svg_text), {"jobs": jobs, "preamble": preamble or ""}
+
+
+def stamp_math_pdf(pdf, job, notes):
+    snips = [s for _, s, _ in job["jobs"]]
+    try:
+        with tempfile.TemporaryDirectory(prefix="mlfig_tex_") as ttd:
+            comp = tex_math.compile_snippets(snips, job["preamble"], workdir=ttd, svg=False, pdf=True)
+            tex_math.stamp_pdf(pdf, [r for _, _, r in job["jobs"]], comp["pdf"])
+        return len(snips)
+    except Exception as e:
+        notes.append(f"math in PDF: stamping failed ({str(e).splitlines()[-1][:200]})")
+        return 0
 
 
 # ----------------------------------------------------------------------------- main
@@ -1256,6 +1714,11 @@ def main(argv=None):
     ap.add_argument("--align-tol", type=float, default=3.0, help="flag centres that differ by 0.5..N units (default 3)")
     ap.add_argument("--pdf-text", choices=["auto", "fonts", "outline"], default="auto",
                     help="auto: keep embedded fonts unless they are Type 3, then outline them; fonts: never outline; outline: always outline text")
+    ap.add_argument("--paper", help="paper's main .tex: $...$ math uses its math fonts, packages and \\newcommand macros (stored in the SVG)")
+    ap.add_argument("--math", help="math setup override: " + ", ".join(tex_math.MATH_SETUPS) + " or verbatim LaTeX (default: from --paper, else cm)")
+    ap.add_argument("--no-macros", action="store_true", help="with --paper, do not copy the paper's macro definitions")
+    ap.add_argument("--no-typeset", action="store_true", help="do not (re)typeset $...$ math")
+    ap.add_argument("--no-tex-fonts", action="store_true", help="do not add the TeX font directories to fontconfig for Chromium")
     ap.add_argument("--keep-review", action="store_true", help="with --export, keep .debug/.preview PNGs")
     ap.add_argument("--strict", action="store_true", help="exit 1 on warnings too")
     ap.add_argument("--json", help="write the full report as JSON to this path")
@@ -1273,6 +1736,12 @@ def main(argv=None):
             print(f"  {k:9s} {'-' if not v else (v[1] if isinstance(v, tuple) else v)}")
         for tool in ("pdfinfo", "pdffonts", "pdfimages", "pdftoppm"):
             print(f"  {tool:9s} {shutil.which(tool) or '-'}")
+        print("LaTeX math ($...$ in <text>):")
+        tenv = tex_math.tex_env()
+        for k_ in ("latex", "pdflatex", "dvisvgm", "kpsewhich", "pymupdf"):
+            print(f"  {k_:9s} {tenv.get(k_) or '-'}")
+        for p_ in tex_math.env_problems(tenv, need_pdf=True):
+            print("  note:", p_)
         if "chromium" not in backends:
             print("  note: exact geometry lint needs Chromium via Playwright (pip install playwright && playwright install chromium)")
         return 0
@@ -1288,6 +1757,14 @@ def main(argv=None):
     stem = svg_path.stem
     tname, tpt, tdesc = parse_target(a.target)
 
+    notes = []
+    if not a.no_tex_fonts and (backends.get("chromium") or backends.get("rsvg") or backends.get("inkscape")):
+        fc_td = tempfile.mkdtemp(prefix="mlfig_fc_")
+        atexit.register(shutil.rmtree, fc_td, True)
+        fc_env, fc_dirs = tex_math.fontconfig_env(fc_td)
+        if fc_env:
+            os.environ["FONTCONFIG_FILE"] = fc_env["FONTCONFIG_FILE"]
+
     static, meta = static_lint(svg_path)
     if meta.get("fatal"):
         tag_issues(static)
@@ -1295,6 +1772,16 @@ def main(argv=None):
         return 2
     vx, vy, VW, VH = meta["vb"]
     svg_text = meta["text"]
+    tex_issues = []
+    new_text = typeset_math(svg_path, svg_text, tpt, VW, VH, backends.get("chromium"), a.chromium_path, a, notes, tex_issues)
+    if new_text != svg_text:
+        static, meta = static_lint(svg_path)
+        if meta.get("fatal"):
+            tag_issues(static)
+            print_report(svg_path, static, None, {}, None, {}, tname, tpt, tdesc, {"notes": notes}, a)
+            return 2
+        svg_text = meta["text"]
+    static += tex_issues
 
     review = not a.export and not a.check
     want_png = not a.check and not a.no_png
@@ -1339,10 +1826,14 @@ def main(argv=None):
         return 2
 
     opt = {"step": 2.0, "edgeMargin": a.edge_margin, "minPad": a.min_pad, "tipOffset": a.tip_offset, "alignTol": a.align_tol,
-           "targetPt": tpt, "targetName": tname, "minPt": a.min_pt, "errPt": a.err_pt, "textGap": 2.0, "endSkip": 3.0}
-    analysis, written, geometry, notes = None, {}, "approximate", []
+           "targetPt": tpt, "targetName": tname, "minPt": a.min_pt, "errPt": a.err_pt, "textGap": 2.0, "endSkip": 3.0,
+           "mathScriptErrPt": tex_math.MIN_SCRIPT_PT}
+    analysis, written, geometry = None, {}, "approximate"
     issues = None
     chromium = backends.get("chromium")
+    pdf_svg_text, stamp_job = svg_text, None
+    if want_pdf:
+        pdf_svg_text, stamp_job = prepare_math_pdf(svg_text, meta["root"], meta["vb"], pdf_wpt, notes)
     if chromium:
         use_for_render = render_be == "chromium"
         cfg = {
@@ -1352,6 +1843,7 @@ def main(argv=None):
             "debug": files["debug"], "debugScale": debug_scale, "grid": a.grid,
             "pdf": files["pdf"] if (pdf_be == "chromium") else None,
             "pdfW": round(pdf_wpt / 0.75, 3), "pdfH": round(pdf_hpt / 0.75, 3),
+            "pdfSvgText": pdf_svg_text if stamp_job else None,
             "executablePath": a.chromium_path,
         }
         try:
@@ -1380,7 +1872,7 @@ def main(argv=None):
         if need_png:
             written.update(render_cli(render_be, svg_path, svg_text, png=files["png"], png_px=(round(VW * scale), round(VH * scale))))
         if need_pdf:
-            written.update(render_cli(pdf_be, svg_path, svg_text, pdf=files["pdf"], pdf_pt=(pdf_wpt, pdf_hpt)))
+            written.update(render_cli(pdf_be, svg_path, pdf_svg_text, pdf=files["pdf"], pdf_pt=(pdf_wpt, pdf_hpt)))
     except Exception as e:
         print(f"error: rendering failed: {e}", file=sys.stderr)
         return 2
@@ -1409,8 +1901,29 @@ def main(argv=None):
                 notes.append("PDF text outlining needs Chromium (Playwright) + pdftocairo (poppler)")
         if "text" not in pdf_info:
             pdf_info["text"] = "embedded fonts"
+        if stamp_job:
+            n_st = stamp_math_pdf(written["pdf"], stamp_job, notes)
+            if n_st:
+                pdf_info["math"] = f"{n_st} snippet(s) with LaTeX Type 1 fonts"
+            else:   # put the outlined math back rather than ship a PDF without it
+                try:
+                    if pdf_be == "chromium" and chromium:
+                        cfg2 = {"svg": str(svg_path), "cssW": VW, "cssH": VH, "analyze": False, "staticIssues": [], "pngScale": 1,
+                                "png": None, "preview": None, "debug": None, "grid": a.grid, "pdf": files["pdf"],
+                                "pdfW": round(pdf_wpt / 0.75, 3), "pdfH": round(pdf_hpt / 0.75, 3), "executablePath": a.chromium_path}
+                        run_chromium(chromium[0], cfg2, svg_text)
+                    else:
+                        render_cli(pdf_be, svg_path, svg_text, pdf=files["pdf"], pdf_pt=(pdf_wpt, pdf_hpt))
+                    if a.pdf_text == "outline" or (a.pdf_text == "auto" and has_t3):
+                        outline_pdf_text(written["pdf"], chromium[0], a.chromium_path)
+                    pdf_info["math"] = "glyph outlines (stamping failed)"
+                except Exception as e:
+                    notes.append(f"could not restore the math in the PDF: {str(e).splitlines()[-1][:200]}")
+        elif meta["root"] is not None and math_placements(meta["root"], meta["vb"], pdf_wpt):
+            pdf_info["math"] = "glyph outlines"
         counts = {s: sum(1 for i in issues if i["sev"] == s) for s in ("error", "warn", "info")}
-        p_issues, p_info = check_pdf(written["pdf"], pdf_wpt, pdf_hpt, written.get("png"), meta.get("first_family"))
+        outlined = pdf_info.get("text", "").startswith("outlined")
+        p_issues, p_info = check_pdf(written["pdf"], pdf_wpt, pdf_hpt, written.get("png"), None if outlined else meta.get("first_family"))
         pdf_info.update(p_info)
         tag_issues(p_issues, counts)
         issues += p_issues
@@ -1445,6 +1958,12 @@ def print_report(svg_path, issues, stats, files, be, pdf_info, tname, tpt, tdesc
             cmp_ = ", ".join(f"{t} {sizes[0] * TARGETS[t][0] * 72 / VW:.1f}pt" for t in COMPARE_TARGETS if t != tname)
             out.append(f"fonts     {tiers}   (min at other widths: {cmp_})")
         out.append(f"counted   {stats.get('nTexts', 0)} texts, {stats.get('nShapes', 0)} filled shapes, {stats.get('nEdges', 0)} connectors")
+        mi = stats.get("math") or []
+        if mi:
+            base_ = sorted({m["pt"] for m in mi})
+            scr = sorted({m["scriptPt"] for m in mi if m.get("hasScripts")})
+            out.append(f"math      {len(mi)} LaTeX group(s): base {', '.join(f'{v:g}' for v in base_)}pt"
+                       + (f", scripts {', '.join(f'{v:g}' for v in scr)}pt" if scr else "") + " (printed)")
     for n in (extra.get("notes") or []):
         out.append(f"note      {n}")
     if files:
@@ -1470,8 +1989,14 @@ def print_report(svg_path, issues, stats, files, be, pdf_info, tname, tpt, tdesc
         bits = []
         if pdf_info.get("text"):
             bits.append("text " + pdf_info["text"])
-        if pdf_info.get("fonts"):
+        if pdf_info.get("math"):
+            bits.append("math " + pdf_info["math"])
+        if pdf_info.get("font_types"):
+            bits.append("fonts " + ", ".join(pdf_info["font_types"]))
+        elif pdf_info.get("fonts"):
             bits.append("fonts " + ", ".join(pdf_info["fonts"]))
+        if pdf_info.get("text_sizes"):
+            bits.append("text sizes " + ", ".join(f"{f} {'/'.join(f'{v:g}' for v in vs)}pt" for f, vs in pdf_info["text_sizes"].items()))
         if "raster_images" in pdf_info:
             bits.append(f"raster images {pdf_info['raster_images']}")
         if "png_pdf_diff" in pdf_info:
