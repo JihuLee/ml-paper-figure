@@ -1,0 +1,156 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="800" height="290" viewBox="0 0 800 290" fill="#1F2933"
+     font-family="Inter, 'Helvetica Neue', Helvetica, Arial, 'Liberation Sans', sans-serif">
+  <defs>
+    <style>
+      .t-stage { font-size: 17px; font-weight: 600; }
+      .t-mod   { font-size: 15px; font-weight: 600; }
+      .t-sub   { font-size: 13px; font-weight: 400; }
+      .t-dim   { font-size: 13px; font-weight: 400; }
+      .t-math  { font-family: 'STIX Two Text', 'Times New Roman', 'Liberation Serif', 'DejaVu Serif', serif; font-style: italic; font-weight: 400; }
+    </style>
+    <marker id="ah-data" viewBox="0 0 10 8" refX="7.5" refY="4" markerWidth="8" markerHeight="6.4" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0L10 4L0 8L2.5 4Z" fill="#4B5768"/></marker>
+    <marker id="ah-frozen" viewBox="0 0 10 8" refX="7.5" refY="4" markerWidth="8" markerHeight="6.4" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0L10 4L0 8L2.5 4Z" fill="#3A6A9E"/></marker>
+    <marker id="ah-proposed" viewBox="0 0 10 8" refX="7.5" refY="4" markerWidth="8" markerHeight="6.4" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0L10 4L0 8L2.5 4Z" fill="#B5602A"/></marker>
+    <marker id="ah-train" viewBox="0 0 10 8" refX="7.5" refY="4" markerWidth="8" markerHeight="6.4" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0L10 4L0 8L2.5 4Z" fill="#3B806A"/></marker>
+    <marker id="ah-loss" viewBox="0 0 10 8" refX="7.5" refY="4" markerWidth="8" markerHeight="6.4" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0L10 4L0 8L2.5 4Z" fill="#A84B61"/></marker>
+    <marker id="ah-aux" viewBox="0 0 10 8" refX="7.5" refY="4" markerWidth="8" markerHeight="6.4" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0L10 4L0 8L2.5 4Z" fill="#6A5A9B"/></marker>
+    <g id="badge-frozen">
+      <circle r="7.5" fill="#FFFFFF" stroke="#3A6A9E" stroke-width="1.1"/>
+      <path d="M0 4.60L0 -4.60M3.98 2.30L-3.98 -2.30M3.98 -2.30L-3.98 2.30M0 -2.80L-1.06 -3.86M0 -2.80L1.06 -3.86M-2.42 -1.40L-3.87 -1.01M-2.42 -1.40L-2.81 -2.85M-2.42 1.40L-2.81 2.85M-2.42 1.40L-3.87 1.01M0 2.80L1.06 3.86M0 2.80L-1.06 3.86M2.42 1.40L3.87 1.01M2.42 1.40L2.81 2.85M2.42 -1.40L2.81 -2.85M2.42 -1.40L3.87 -1.01" fill="none" stroke="#3A6A9E" stroke-width="1.1" stroke-linecap="round"/>
+    </g>
+    <g id="badge-train">
+      <circle r="7.5" fill="#FFFFFF" stroke="#C8602F" stroke-width="1.1"/>
+      <path d="M0.3 -5.2C1.1 -3 3.9 -1.8 3.9 1.4C3.9 3.9 2.2 5.2 0 5.2C-2.2 5.2 -3.9 3.9 -3.9 1.5C-3.9 -0.4 -2.7 -1.5 -2.2 -3C-1.6 -1.8 -1.2 -0.9 -0.8 -0.5C-0.6 -2.1 -0.3 -3.6 0.3 -5.2Z" fill="#E2703A"/>
+      <path d="M0.2 0.6C1.1 1.6 1.9 2.4 1.9 3.4C1.9 4.4 1.1 5 0 5C-1.1 5 -1.9 4.4 -1.9 3.4C-1.9 2.5 -1.1 1.9 -0.6 1.1C-0.4 1.6 -0.1 1.9 0.2 2.1C0.3 1.6 0.3 1.1 0.2 0.6Z" fill="#F8C98F"/>
+    </g>
+    <g id="badge-lock">
+      <circle r="7.5" fill="#FFFFFF" stroke="#3A6A9E" stroke-width="1.1"/>
+      <path d="M-2.3 -0.6V-2.3A2.3 2.3 0 0 1 2.3 -2.3V-0.6" fill="none" stroke="#3A6A9E" stroke-width="1.2"/>
+      <rect x="-3.4" y="-0.8" width="6.8" height="5.2" rx="1.1" fill="#3A6A9E"/>
+    </g>
+    <g id="op-mul"><circle r="7" fill="#FFFFFF" stroke="#4B5768" stroke-width="1.2"/><path d="M-2.6 -2.6L2.6 2.6M2.6 -2.6L-2.6 2.6" stroke="#4B5768" stroke-width="1.4" stroke-linecap="round"/></g>
+    <g id="op-cat"><circle r="7" fill="#FFFFFF" stroke="#4B5768" stroke-width="1.2"/><path d="M-1.6 -3.6V3.6M1.6 -3.6V3.6" stroke="#4B5768" stroke-width="1.4" stroke-linecap="round"/></g>
+    <g id="thumb-image">
+      <rect width="40" height="40" rx="3" fill="#DCE8F5"/>
+      <circle cx="29" cy="11" r="4.5" fill="#F2C46D"/>
+      <path d="M0 30L11 18L19 26L26 20L40 31V37Q40 40 37 40H3Q0 40 0 37Z" fill="#9CC3AE"/>
+      <path d="M0 35L9 29L18 34L27 28L40 36V37Q40 40 37 40H3Q0 40 0 37Z" fill="#6E9A86"/>
+      <rect width="40" height="40" rx="3" fill="none" stroke="#A3AEBD" stroke-width="1"/>
+    </g>
+    <g id="thumb-patches">
+      <use xlink:href="#thumb-image"/>
+      <path d="M10 0V40M20 0V40M30 0V40M0 10H40M0 20H40M0 30H40" stroke="#FFFFFF" stroke-width="1.2"/>
+    </g>
+    <g id="thumb-seg">
+      <rect width="40" height="40" rx="3" fill="#B7D3EE"/>
+      <path d="M0 30L11 18L19 26L26 20L40 31V37Q40 40 37 40H3Q0 40 0 37Z" fill="#A8D5BF"/>
+      <path d="M0 35L9 29L18 34L27 28L40 36V37Q40 40 37 40H3Q0 40 0 37Z" fill="#E8D99A"/>
+      <circle cx="29" cy="11" r="4.5" fill="#F2B98A"/>
+      <rect width="40" height="40" rx="3" fill="none" stroke="#A3AEBD" stroke-width="1"/>
+    </g>
+    <g id="thumb-noise">
+      <path fill="#4B5563" fill-opacity="0.17" d="M24.53 0h5.33v5.33h-5.33zM0 12.27h5.33v5.33h-5.33zM24.53 12.27h5.33v5.33h-5.33zM30.67 12.27h5.33v5.33h-5.33zM0 18.4h5.33v5.33h-5.33z"/>
+      <path fill="#4B5563" fill-opacity="0.33" d="M0 0h5.33v5.33h-5.33zM12.27 0h5.33v5.33h-5.33zM18.4 0h5.33v5.33h-5.33zM30.67 0h5.33v5.33h-5.33zM6.13 18.4h5.33v5.33h-5.33zM30.67 18.4h5.33v5.33h-5.33zM12.27 24.53h5.33v5.33h-5.33zM0 30.67h5.33v5.33h-5.33zM6.13 30.67h5.33v5.33h-5.33zM12.27 30.67h5.33v5.33h-5.33z"/>
+      <path fill="#4B5563" fill-opacity="0.50" d="M18.4 6.13h5.33v5.33h-5.33zM30.67 6.13h5.33v5.33h-5.33zM12.27 18.4h5.33v5.33h-5.33zM18.4 18.4h5.33v5.33h-5.33zM0 24.53h5.33v5.33h-5.33zM18.4 30.67h5.33v5.33h-5.33zM30.67 30.67h5.33v5.33h-5.33z"/>
+      <path fill="#4B5563" fill-opacity="0.67" d="M6.13 0h5.33v5.33h-5.33zM6.13 6.13h5.33v5.33h-5.33zM24.53 6.13h5.33v5.33h-5.33zM6.13 12.27h5.33v5.33h-5.33zM12.27 12.27h5.33v5.33h-5.33zM18.4 12.27h5.33v5.33h-5.33zM24.53 18.4h5.33v5.33h-5.33zM6.13 24.53h5.33v5.33h-5.33zM24.53 24.53h5.33v5.33h-5.33zM24.53 30.67h5.33v5.33h-5.33z"/>
+      <path fill="#4B5563" fill-opacity="0.83" d="M0 6.13h5.33v5.33h-5.33zM12.27 6.13h5.33v5.33h-5.33zM18.4 24.53h5.33v5.33h-5.33zM30.67 24.53h5.33v5.33h-5.33z"/>
+      <rect x="-1.5" y="-1.5" width="39" height="39" rx="3" fill="none" stroke="#A3AEBD" stroke-width="1"/>
+    </g>
+    <g id="thumb-heat">
+      <path fill="#D9772F" fill-opacity="0.17" d="M0 0h5.33v5.33h-5.33zM0 6.13h5.33v5.33h-5.33zM0 12.27h5.33v5.33h-5.33zM0 18.4h5.33v5.33h-5.33zM0 24.53h5.33v5.33h-5.33zM0 30.67h5.33v5.33h-5.33zM6.13 30.67h5.33v5.33h-5.33z"/>
+      <path fill="#D9772F" fill-opacity="0.33" d="M6.13 0h5.33v5.33h-5.33zM6.13 6.13h5.33v5.33h-5.33zM6.13 12.27h5.33v5.33h-5.33zM6.13 18.4h5.33v5.33h-5.33zM6.13 24.53h5.33v5.33h-5.33zM12.27 30.67h5.33v5.33h-5.33z"/>
+      <path fill="#D9772F" fill-opacity="0.50" d="M12.27 0h5.33v5.33h-5.33zM30.67 0h5.33v5.33h-5.33zM12.27 24.53h5.33v5.33h-5.33zM18.4 30.67h5.33v5.33h-5.33zM24.53 30.67h5.33v5.33h-5.33zM30.67 30.67h5.33v5.33h-5.33z"/>
+      <path fill="#D9772F" fill-opacity="0.67" d="M18.4 0h5.33v5.33h-5.33zM24.53 0h5.33v5.33h-5.33zM12.27 6.13h5.33v5.33h-5.33zM30.67 6.13h5.33v5.33h-5.33zM12.27 12.27h5.33v5.33h-5.33zM30.67 12.27h5.33v5.33h-5.33zM12.27 18.4h5.33v5.33h-5.33zM30.67 18.4h5.33v5.33h-5.33zM18.4 24.53h5.33v5.33h-5.33zM24.53 24.53h5.33v5.33h-5.33zM30.67 24.53h5.33v5.33h-5.33z"/>
+      <path fill="#D9772F" fill-opacity="0.83" d="M18.4 6.13h5.33v5.33h-5.33zM24.53 6.13h5.33v5.33h-5.33zM18.4 12.27h5.33v5.33h-5.33zM24.53 12.27h5.33v5.33h-5.33zM18.4 18.4h5.33v5.33h-5.33zM24.53 18.4h5.33v5.33h-5.33z"/>
+      <rect x="-1.5" y="-1.5" width="39" height="39" rx="3" fill="none" stroke="#A3AEBD" stroke-width="1"/>
+    </g>
+  </defs>
+  <rect id="bg" width="800" height="290" fill="#FFFFFF"/>
+
+  <!-- ===== stage cards ===== -->
+  <rect id="card-a" x="12" y="12" width="186" height="240" rx="10" fill="#F7F8FA" stroke="#E2E6EC" stroke-width="1"/>
+  <rect id="card-b" x="212" y="12" width="372" height="240" rx="10" fill="#F7F8FA" stroke="#E2E6EC" stroke-width="1"/>
+  <rect id="card-c" x="598" y="12" width="190" height="240" rx="10" fill="#F7F8FA" stroke="#E2E6EC" stroke-width="1"/>
+  <text class="t-stage" x="26" y="37">(a) Frozen Encoder</text>
+  <text class="t-stage" x="226" y="37">(b) Uncertainty-Aware Module (UAM)</text>
+  <text class="t-stage" x="612" y="37">(c) Decoder &amp; Loss</text>
+
+  <!-- ===== edges (under modules) ===== -->
+  <path id="e-img-enc" class="edge" d="M 68 140 L 94 140" fill="none" stroke="#4B5768" stroke-width="1.6" marker-end="url(#ah-data)"/>
+  <path id="e-enc-feat" class="edge" d="M 184 140 L 234 140" fill="none" stroke="#3A6A9E" stroke-width="1.6" marker-end="url(#ah-frozen)"/>
+  <path id="e-feat-head" class="edge" d="M 270 140 L 296 140" fill="none" stroke="#4B5768" stroke-width="1.6" marker-end="url(#ah-data)"/>
+  <path id="e-head-sample" class="edge" d="M 382 140 Q 390 140 390 132 L 390 108 Q 390 100 398 100 L 410 100" fill="none" stroke="#B5602A" stroke-width="1.6" marker-end="url(#ah-proposed)"/>
+  <path id="e-head-umap" class="edge" d="M 382 140 Q 390 140 390 148 L 390 172 Q 390 180 398 180 L 410 180" fill="none" stroke="#B5602A" stroke-width="1.6" marker-end="url(#ah-proposed)"/>
+  <path id="e-sample-gate" class="edge" d="M 516 100 L 532 100 Q 540 100 540 108 L 540 131" fill="none" stroke="#B5602A" stroke-width="1.6" marker-end="url(#ah-proposed)"/>
+  <path id="e-umap-gate" class="edge" d="M 516 180 L 532 180 Q 540 180 540 172 L 540 149" fill="none" stroke="#B5602A" stroke-width="1.6" marker-end="url(#ah-proposed)"/>
+  <path id="e-gate-dec" class="edge" d="M 547 140 L 610 140" fill="none" stroke="#B5602A" stroke-width="1.6" marker-end="url(#ah-proposed)"/>
+  <path id="e-dec-yhat" class="edge" d="M 688 140 L 714 140" fill="none" stroke="#3B806A" stroke-width="1.6" marker-end="url(#ah-train)"/>
+  <path id="e-yhat-ltask" class="edge" d="M 736 160 L 736 212" fill="none" stroke="#A84B61" stroke-width="1.4" stroke-dasharray="5 3.5" marker-end="url(#ah-loss)"/>
+  <path id="e-head-lkl" class="edge" d="M 340 166 L 340 218 Q 340 226 348 226 L 612 226" fill="none" stroke="#A84B61" stroke-width="1.4" stroke-dasharray="5 3.5" marker-end="url(#ah-loss)"/>
+
+  <!-- ===== (a) frozen encoder ===== -->
+  <use id="img" xlink:href="#thumb-patches" x="28" y="120"/>
+  <text class="t-mod" x="48" y="178" text-anchor="middle"><tspan class="t-math">x</tspan></text>
+  <text class="t-dim" x="48" y="194" text-anchor="middle" fill="#6B7280">3×H×W</text>
+  <path id="enc" d="M 96 95 Q 96 90 100.9 91 L 179.1 107 Q 184 108 184 113 L 184 167 Q 184 172 179.1 173 L 100.9 189 Q 96 190 96 185 Z" fill="#E4EEF8" stroke="#8DB0D6" stroke-width="1.2"/>
+  <text class="t-mod" x="140" y="135.88" text-anchor="middle">Vision</text>
+  <text class="t-mod" x="140" y="154.62" text-anchor="middle">Encoder</text>
+  <text class="t-dim" x="140" y="206" text-anchor="middle" fill="#6B7280">ViT-B/16</text>
+
+  <!-- ===== (b) UAM ===== -->
+  <g id="feat" class="stack">
+    <rect x="244" y="112" width="26" height="40" rx="3" fill="#EEF1F5" stroke="#A3AEBD" stroke-width="1.1"/>
+    <rect x="240" y="116" width="26" height="40" rx="3" fill="#EEF1F5" stroke="#A3AEBD" stroke-width="1.1"/>
+    <rect x="236" y="120" width="26" height="40" rx="3" fill="#EEF1F5" stroke="#A3AEBD" stroke-width="1.1"/>
+  </g>
+  <text class="t-mod" x="249" y="178" text-anchor="middle"><tspan class="t-math">F</tspan></text>
+  <text class="t-dim" x="249" y="194" text-anchor="middle" fill="#6B7280">N×D</text>
+
+  <rect id="head" x="298" y="114" width="84" height="52" rx="7" fill="#FDEBDC" stroke="#E79A5D" stroke-width="1.6"/>
+  <text class="t-mod" x="340" y="135.88" text-anchor="middle">Gaussian</text>
+  <text class="t-mod" x="340" y="154.62" text-anchor="middle">Head</text>
+
+  <rect id="sample" x="412" y="78" width="104" height="44" rx="7" fill="#FDEBDC" stroke="#E79A5D" stroke-width="1.6"/>
+  <use xlink:href="#thumb-noise" transform="translate(421 87) scale(0.72)"/>
+  <text class="t-mod" x="454" y="105.25">Sample</text>
+  <text class="t-dim" x="464" y="71" text-anchor="middle" fill="#6B7280"><tspan class="t-math">z</tspan> = <tspan class="t-math">μ</tspan> + <tspan class="t-math">σ</tspan> ⊙ <tspan class="t-math">ε</tspan></text>
+
+  <rect id="umap" x="412" y="158" width="104" height="44" rx="7" fill="#FDEBDC" stroke="#E79A5D" stroke-width="1.6"/>
+  <use xlink:href="#thumb-heat" transform="translate(421 167) scale(0.72)"/>
+  <text class="t-mod" x="454" y="185.25">U-Map</text>
+  <text class="t-dim" x="464" y="151" text-anchor="middle" fill="#6B7280"><tspan class="t-math">U</tspan> = ‖<tspan class="t-math">σ</tspan>‖</text>
+
+  <use id="gate" xlink:href="#op-mul" x="540" y="140"/>
+  <text class="t-mod" x="566" y="134" text-anchor="middle"><tspan class="t-math">F̃</tspan></text>
+
+  <!-- ===== (c) decoder & loss ===== -->
+  <path id="dec" d="M 612 113 Q 612 108 616.87 106.85 L 683.13 91.15 Q 688 90 688 95 L 688 185 Q 688 190 683.13 188.85 L 616.87 173.15 Q 612 172 612 167 Z" fill="#E3F2ED" stroke="#86C0AA" stroke-width="1.2"/>
+  <text class="t-mod" x="650" y="145.25" text-anchor="middle">Decoder</text>
+  <use id="yhat" xlink:href="#thumb-seg" x="716" y="120"/>
+  <text class="t-mod" x="702" y="134" text-anchor="middle"><tspan class="t-math">ŷ</tspan></text>
+
+  <rect id="lkl" x="614" y="214" width="60" height="24" rx="12" fill="#F9E6EA" stroke="#D9909F" stroke-width="1.2"/>
+  <text x="644" y="231" text-anchor="middle" font-size="15" fill="#A84B61"><tspan class="t-math">L</tspan><tspan font-size="13" dy="3">KL</tspan></text>
+  <rect id="ltask" x="706" y="214" width="60" height="24" rx="12" fill="#F9E6EA" stroke="#D9909F" stroke-width="1.2"/>
+  <text x="736" y="231" text-anchor="middle" font-size="15" fill="#A84B61"><tspan class="t-math">L</tspan><tspan font-size="13" dy="3">task</tspan></text>
+
+  <!-- ===== badges ===== -->
+  <use class="badge" xlink:href="#badge-frozen" x="182" y="110"/>
+  <use class="badge" xlink:href="#badge-train" x="380" y="116"/>
+  <use class="badge" xlink:href="#badge-train" x="686" y="92"/>
+
+  <!-- ===== legend ===== -->
+  <g class="legend">
+    <path d="M110 270H136" fill="none" stroke="#4B5768" stroke-width="1.6" marker-end="url(#ah-data)"/>
+    <text class="t-dim" x="144" y="274.55" fill="#4B5563">Forward</text>
+    <path d="M215 270H241" fill="none" stroke="#A84B61" stroke-width="1.4" stroke-dasharray="5 3.5" marker-end="url(#ah-loss)"/>
+    <text class="t-dim" x="249" y="274.55" fill="#4B5563">Loss / supervision</text>
+    <use class="badge" xlink:href="#badge-frozen" x="388.5" y="270"/>
+    <text class="t-dim" x="402" y="274.55" fill="#4B5563">Frozen</text>
+    <use class="badge" xlink:href="#badge-train" x="472.5" y="270"/>
+    <text class="t-dim" x="486" y="274.55" fill="#4B5563">Trainable</text>
+    <rect x="563" y="264.5" width="16" height="11" rx="3" fill="#FDEBDC" stroke="#E79A5D" stroke-width="1.2"/>
+    <text class="t-dim" x="587" y="274.55" fill="#4B5563">Proposed (UAM)</text>
+  </g>
+</svg>
