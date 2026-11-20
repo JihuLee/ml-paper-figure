@@ -1,75 +1,115 @@
 # ml-paper-figure
 
-NeurIPS · ICML · ICLR · CVPR 등 ML/AI 학회 논문에 바로 넣을 수 있는 **Figure 1**(프레임워크 개요, 모델 아키텍처,
-파이프라인 다이어그램)을 만드는 재사용 가능한 Agent Skill입니다. 에이전트가 바로 SVG를 그리지 않고
-**Plan → Draft → Render & Critique(최대 3회) → Export** 4단계를 거치도록 강제합니다. 결과물은
-자급자족형 `.svg`, LaTeX용 벡터 `.pdf`, 발표·미리보기용 고해상도 `.png`입니다.
+An agent skill that draws **Figure 1** for ML papers (framework overviews, model architectures, method pipelines) as a
+self-contained SVG, a vector PDF for LaTeX, and a high-res PNG. Instead of writing SVG in one shot, the agent plans a
+blueprint, drafts, then renders and critiques its own output (up to three rounds) with an offline lint script before
+exporting.
 
-![example](examples/uncertainty-aware/figure1_uam.png)
+![Example Figure 1 produced by the skill](examples/uncertainty-aware/figure1_uam.png)
 
-*위 그림은 스킬 검증 실행 결과입니다(Frozen Encoder → 제안 모듈 UAM → Decoder + 점선 손실 경로).
-과정은 [`examples/uncertainty-aware/critique-log.md`](examples/uncertainty-aware/critique-log.md)에 기록되어 있습니다.*
+<sub>Verification run: frozen encoder → proposed module → decoder with dashed loss paths, NeurIPS width, 0 lint issues.
+See the <a href="examples/uncertainty-aware/critique-log.md">critique log</a>.</sub>
 
-## 구조
+## Install
+
+```bash
+npx github:JihuLee/ml-paper-figure
+```
+
+This copies the skill to `~/.claude/skills/ml-paper-figure` for Claude Code. Options:
+
+| Flag | Installs to |
+|---|---|
+| *(none)* or `--global` | `~/.claude/skills/ml-paper-figure` (every project) |
+| `--project` | `./.claude/skills/ml-paper-figure` (current project) |
+| `--agents` | `./.agents/skills/ml-paper-figure` (agents that read `.agents/skills`) |
+| `--dir <path>` | `<path>/ml-paper-figure` |
+
+Add `--force` to update an existing install, `--uninstall` to remove it, or `--dry-run` to preview.
+You can also use the [skills CLI](https://github.com/vercel-labs/skills), which supports many agents:
+
+```bash
+npx skills add JihuLee/ml-paper-figure
+```
+
+Then check which renderers the skill can use:
+
+```bash
+python3 ~/.claude/skills/ml-paper-figure/scripts/render_svg.py --list-backends
+```
+
+## Usage
+
+Ask your agent for a figure in plain language. Paste or point to Methods text, LaTeX, Markdown or PyTorch code:
+
+> Make Figure 1 for our NeurIPS paper from Section 3. The ViT encoder is frozen; our contribution is the gating module.
+
+The agent writes `figure1.blueprint.md`, `figure1.svg`, then `figure1.pdf` and `figure1.png`, and reports the
+smallest printed font size and any accepted warnings.
+
+## How it works
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/architecture-dark.png">
+  <img alt="Architecture: the agent follows SKILL.md, uses svg_geom.py and render_svg.py, renders with local tools, and loops review images back" src="docs/architecture.png">
+</picture>
+
+1. **Plan.** Extract stages, modules, tensor shapes and flows. Fix the canvas (2 SVG units = 1 printed pt for the
+   target venue) and every module's box before drawing.
+2. **Draft.** Write one self-contained SVG from tested primitives: role-colored arrowheads, vector frozen/trainable
+   badges, trapezoids, stacks and mini visualizations. `svg_geom.py` computes the exact paths.
+3. **Render & critique.** `render_svg.py` lints the geometry (overflowing text, arrows through boxes, floating
+   arrowheads, near-misalignment, font size in printed pt) and writes a debug overlay and a printed-size preview for
+   the agent to inspect. At most three rounds.
+4. **Export.** Vector PDF sized to the venue's printed width, high-res PNG, and PDF checks (single page, no
+   rasterization, no Type 3 fonts).
+
+## Layout
 
 ```
 .claude/skills/ml-paper-figure/
-├── SKILL.md                    # 트리거 description + 4단계 실행 프로토콜 + 품질 기준
+├── SKILL.md                     # trigger + 4-phase protocol + quality bar
 ├── references/
-│   ├── design-system.md        # 학회별 캔버스 크기, 레이아웃 간격, 저채도 팔레트, 타이포 위계, ML 도형 메타포, 연결선 규칙
-│   └── svg-primitives.md       # 복붙용 <defs>(역할별 화살촉, 벡터 배지, 썸네일), 텍스트 정렬·둥근 직각 경로 공식, 사다리꼴/스택/큐보이드
+│   ├── design-system.md         # venue sizes, spacing, palette roles, type tiers, metaphors, connectors
+│   └── svg-primitives.md        # copy-paste <defs>, text and path formulas, ML shape templates
 ├── scripts/
-│   ├── render_svg.py           # 린트 + PNG/PDF 렌더링 + 검수용 debug/preview 이미지 + PDF 검사 (오프라인)
-│   └── svg_geom.py             # 좌표 계산기: 연결선 path, 사다리꼴, 스택, 그리드 썸네일, 라벨 중앙 정렬·폭 검사
-└── assets/
-    ├── primitives-gallery.svg/.png   # 모든 프리미티브의 렌더링 견본
-    └── example-figure1.svg/.png      # 린트를 통과한 완성 예시
-examples/uncertainty-aware/     # 검증 실행: 입력 → 블루프린트 → 3회 검수 라운드 → 최종 산출물
+│   ├── render_svg.py            # lint, render (PNG/PDF), review images, PDF checks
+│   └── svg_geom.py              # exact coordinates for paths, shapes, grids, labels
+└── assets/                      # primitives gallery, complete example figure
+bin/install.js                   # npx installer
+examples/uncertainty-aware/      # verification run: input → blueprint → 3 rounds → outputs
+docs/                            # diagram above (HTML source + PNGs)
 ```
 
-## 설치
+## Requirements
 
-이 저장소에서 작업할 때는 프로젝트 스킬(`.claude/skills/`)로 자동 인식됩니다. 다른 프로젝트에서도 쓰려면 사용자 스킬 디렉터리로 복사하세요.
+- Python 3.8+ and one SVG renderer. The script auto-detects them in this order: Chromium via
+  [Playwright](https://playwright.dev/python/) (recommended; needed for exact geometry lint), `rsvg-convert`, Inkscape,
+  cairosvg, resvg (PNG only).
+- Optional: poppler-utils (PDF checks and Type 3 → outline conversion) and Pillow (PNG/PDF comparison).
+- Node.js 14.14+ for the npx installer only.
+
+Everything runs locally; no cloud APIs.
+
+## Standalone scripts
+
+Run from the skill folder (`~/.claude/skills/ml-paper-figure` after install):
 
 ```bash
-cp -r .claude/skills/ml-paper-figure ~/.claude/skills/
+python3 scripts/render_svg.py fig.svg --target neurips            # review: PNG + debug + preview + lint report
+python3 scripts/render_svg.py fig.svg --target cvpr --export      # final: vector PDF + high-res PNG + PDF checks
+python3 scripts/svg_geom.py elbow 382,140 412,100 --mode hvh --mid 390 --arrow --marker ah-proposed
 ```
 
-`.agents/skills/` 규약을 쓰는 에이전트라면 같은 폴더를 그 아래로 복사하면 됩니다.
+`--target` accepts `neurips`, `iclr`, `icml`, `icml-col`, `cvpr`, `cvpr-col`, `eccv`, `acl`, `acl-col`, `aaai`,
+`aaai-col`, or a length such as `5.5in`.
 
-### 요구 사항
-- Python 3.8+
-- SVG 렌더러 하나(자동 감지): **Playwright + Chromium**(권장: 정확한 기하 린트), `rsvg-convert`, `inkscape`, `cairosvg`, `resvg`(PNG만)
-- 선택: poppler-utils(`pdfinfo`, `pdffonts`, `pdfimages`, `pdftoppm`, `pdftocairo`)는 PDF 검사와 Type 3 폰트 윤곽선 변환에 쓰이고, Pillow는 PNG/PDF 비교에 쓰입니다.
+## Status
 
-```bash
-python3 .claude/skills/ml-paper-figure/scripts/render_svg.py --list-backends
-```
+Tested: the Chromium (Node Playwright) path for exact lint, rendering, debug overlays and vector PDF; approximate lint
+without a browser (`--no-browser`); Type 3 outlining; the npx installer. Implemented but not yet tested: the
+rsvg-convert, Inkscape, cairosvg and resvg backends and the Python Playwright driver. The `npx skills add` route
+follows the skills CLI's documented discovery of `.claude/skills/` but has not been run against this repo.
 
-## 사용
-
-에이전트에게 평소처럼 요청하면 됩니다. 예: *"이 Methods 섹션으로 NeurIPS용 Figure 1 그려줘"*, *"이 PyTorch 모델 구조도를 논문 그림으로"*.
-스크립트는 단독으로도 쓸 수 있습니다.
-
-```bash
-python3 .claude/skills/ml-paper-figure/scripts/render_svg.py figures/fig1.svg --target neurips            # 검수: png + debug + preview + 린트 보고
-```
-
-```bash
-python3 .claude/skills/ml-paper-figure/scripts/render_svg.py figures/fig1.svg --target neurips --export   # 최종: 벡터 pdf + 고해상도 png + PDF 검사
-```
-
-```bash
-python3 .claude/skills/ml-paper-figure/scripts/svg_geom.py elbow 382,140 412,100 --mode hvh --mid 390 --arrow --marker ah-proposed
-```
-
-`--target`: `neurips`, `iclr`, `icml`, `icml-col`, `cvpr`, `cvpr-col`, `eccv`, `acl`, `acl-col`, `aaai`, `aaai-col` 또는 `5.5in`, `397pt` 같은 길이.
-
-## 검증 상태
-
-| 항목 | 상태 |
-|---|---|
-| Chromium(Node Playwright) 렌더링·정확 린트·debug 오버레이·벡터 PDF | 이 환경에서 검증 |
-| Chromium 없을 때의 근사 린트(`--no-browser`) | 검증 |
-| Type 3 폰트 → 윤곽선 자동 변환(`pdftocairo`) | 검증 (최종 PDF: 폰트 0, 래스터 0, PNG 대비 차이 1.3 %) |
-| rsvg-convert / inkscape / cairosvg / resvg 백엔드, Python Playwright 경로 | 코드 경로만 구현, 이 환경에 미설치라 **미검증** |
+<sub>Architecture diagram made with stack-diagram (source: <a href="docs/architecture.html">docs/architecture.html</a>).
+Icons: devicon and Lucide.</sub>

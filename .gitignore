@@ -4,3 +4,5 @@ __pycache__/
 *.preview.png
 !examples/**/round*/*.debug.png
 !examples/**/round*/*.preview.png
+node_modules/
+*.tgz
