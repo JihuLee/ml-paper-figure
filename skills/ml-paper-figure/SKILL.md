@@ -1,14 +1,6 @@
 ---
 name: ml-paper-figure
-description: >-
-  Design publication-ready Figure 1 diagrams for ML/AI papers (NeurIPS, ICML, ICLR, CVPR, ECCV, ACL, AAAI):
-  framework overviews, model-architecture schematics, method/pipeline and teaser figures. Produces one
-  self-contained SVG plus a vector PDF for LaTeX \includegraphics and a high-res PNG, using a render-and-critique
-  loop with an offline lint script. Use this skill whenever the user wants to draw, redesign or polish an
-  overview/architecture/pipeline/method figure for a paper, poster or rebuttal, or hands over a Methods section,
-  LaTeX/Markdown text or PyTorch model code and wants it turned into a diagram — even if they only say
-  "make Figure 1", "draw my model", "visualize this architecture", "논문 그림", "모델 구조도 그려줘" or
-  "파이프라인 다이어그램". Not for plots of experimental results (bar/line charts, tables) or cloud-infrastructure diagrams.
+description: 'Design publication-ready Figure 1 diagrams for ML/AI papers (NeurIPS, ICML, ICLR, CVPR, ECCV, ACL, AAAI): framework overviews, model-architecture schematics, method/pipeline and teaser figures. Produces one self-contained SVG plus a vector PDF for LaTeX \includegraphics and a high-res PNG, using a render-and-critique loop with an offline lint script. Use this skill whenever the user wants to draw, redesign or polish an overview/architecture/pipeline/method figure for a paper, poster or rebuttal, or hands over a Methods section, LaTeX/Markdown text or PyTorch model code and wants it turned into a diagram — even if they only say "make Figure 1", "draw my model", "visualize this architecture", "논문 그림", "모델 구조도 그려줘" or "파이프라인 다이어그램". Not for plots of experimental results (bar/line charts, tables) or cloud-infrastructure diagrams.'
 ---
 
 # ML Paper Figure 1
