@@ -13,24 +13,20 @@ See the <a href="examples/uncertainty-aware/critique-log.md">critique log</a>.</
 ## Install
 
 ```bash
-npx github:JihuLee/ml-paper-figure
+npx skills add JihuLee/ml-paper-figure -g
 ```
 
-This copies the skill to `~/.claude/skills/ml-paper-figure` for Claude Code. Options:
+The [skills CLI](https://github.com/vercel-labs/skills) (Node.js 22.20+) detects your coding agents and links the
+skill into each one, e.g. `~/.claude/skills/ml-paper-figure` for Claude Code. Add `-a claude-code` to target one
+agent, or drop `-g` to install into the current project only.
 
-| Flag | Installs to |
+| Task | Command |
 |---|---|
-| *(none)* or `--global` | `~/.claude/skills/ml-paper-figure` (every project) |
-| `--project` | `./.claude/skills/ml-paper-figure` (current project) |
-| `--agents` | `./.agents/skills/ml-paper-figure` (agents that read `.agents/skills`) |
-| `--dir <path>` | `<path>/ml-paper-figure` |
+| Update | `npx skills update -g` |
+| List | `npx skills ls -g` |
+| Remove | `npx skills remove --global ml-paper-figure` |
 
-Add `--force` to update an existing install, `--uninstall` to remove it, or `--dry-run` to preview.
-You can also use the [skills CLI](https://github.com/vercel-labs/skills), which supports many agents:
-
-```bash
-npx skills add JihuLee/ml-paper-figure
-```
+Without Node.js, copy `skills/ml-paper-figure/` into your agent's skills folder.
 
 Then check which renderers the skill can use:
 
@@ -67,7 +63,7 @@ smallest printed font size and any accepted warnings.
 ## Layout
 
 ```
-.claude/skills/ml-paper-figure/
+skills/ml-paper-figure/
 ├── SKILL.md                     # trigger + 4-phase protocol + quality bar
 ├── references/
 │   ├── design-system.md         # venue sizes, spacing, palette roles, type tiers, metaphors, connectors
@@ -76,7 +72,6 @@ smallest printed font size and any accepted warnings.
 │   ├── render_svg.py            # lint, render (PNG/PDF), review images, PDF checks
 │   └── svg_geom.py              # exact coordinates for paths, shapes, grids, labels
 └── assets/                      # primitives gallery, complete example figure
-bin/install.js                   # npx installer
 examples/uncertainty-aware/      # verification run: input → blueprint → 3 rounds → outputs
 docs/                            # diagram above (HTML source + PNGs)
 ```
@@ -87,7 +82,7 @@ docs/                            # diagram above (HTML source + PNGs)
   [Playwright](https://playwright.dev/python/) (recommended; needed for exact geometry lint), `rsvg-convert`, Inkscape,
   cairosvg, resvg (PNG only).
 - Optional: poppler-utils (PDF checks and Type 3 → outline conversion) and Pillow (PNG/PDF comparison).
-- Node.js 14.14+ for the npx installer only.
+- Node.js 22.20+ for `npx skills` only.
 
 Everything runs locally; no cloud APIs.
 
@@ -107,9 +102,9 @@ python3 scripts/svg_geom.py elbow 382,140 412,100 --mode hvh --mid 390 --arrow -
 ## Status
 
 Tested: the Chromium (Node Playwright) path for exact lint, rendering, debug overlays and vector PDF; approximate lint
-without a browser (`--no-browser`); Type 3 outlining; the npx installer. Implemented but not yet tested: the
-rsvg-convert, Inkscape, cairosvg and resvg backends and the Python Playwright driver. The `npx skills add` route
-follows the skills CLI's documented discovery of `.claude/skills/` but has not been run against this repo.
+without a browser (`--no-browser`); Type 3 outlining. Implemented but not yet tested: the rsvg-convert, Inkscape,
+cairosvg and resvg backends and the Python Playwright driver. The repository follows the skills CLI's documented
+`skills/<name>/SKILL.md` layout; `npx skills add` itself has not been run against it in our test environment.
 
 <sub>Architecture diagram made with stack-diagram (source: <a href="docs/architecture.html">docs/architecture.html</a>).
 Icons: devicon and Lucide.</sub>
