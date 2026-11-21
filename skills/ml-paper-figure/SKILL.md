@@ -27,6 +27,7 @@ lint needs Chromium. Without it the checks are approximate, so lean harder on th
 | `assets/primitives-gallery.png` | Optional. A rendered view of every primitive, useful for picking metaphors. |
 | `assets/example-figure1.svg` (+ `.png`) | Optional. A complete, lint-clean Figure 1 (frozen encoder → proposed module → decoder + dashed losses) to copy structure from. |
 | `scripts/svg_geom.py` | Use it any time you need exact coordinates. It prints connector paths, trapezoids, stacks, grids and centred labels with a fit check. |
+| `scripts/tex_math.py` | Used by `render_svg.py` for `$…$` math. Run `--paper main.tex --show` to see the math setup and macros taken from the paper, `--test 'c_{FA}' --pt 6` to typeset one snippet. |
 
 ## Phase 1: Plan (blueprint before any SVG)
 
@@ -73,6 +74,7 @@ Read `references/svg-primitives.md`, then write `<name>.svg`:
 - Draw order: background → cards → edges → modules → labels → badges → legend. Edges sit under modules so their ends tuck under borders.
 - Give modules ids (`id="enc"`), connectors `class="edge"` and `fill="none"`, and mini visuals `data-lint="ignore"`. Lint messages then name elements you can find.
 - Compute coordinates with the formulas or `svg_geom.py`, not by eye. Text centre baseline is `cy + 0.35 × font-size`. Paths end **2u before** the target border, since the standard arrowhead tip overshoots by 2u.
+- **Math is LaTeX**: write symbols between `$…$` inside a `<text>` (`scores $S[i,v,p]$`, `$\mathcal{L}_{\text{KL}}$`) in the paper's notation. The render script typesets them in the paper's math font and macros (`--paper main.tex`) and writes the result into the SVG. Edit only the source `<text>`; never fake math with italic serif text or `<tspan dy>` subscripts (svg-primitives.md §2).
 
 ## Phase 3: Render & critique (loop, max 3 rounds)
 
@@ -80,8 +82,9 @@ Each round:
 
 1. Render and lint:
    ```bash
-   python3 "$SKILL_DIR/scripts/render_svg.py" <name>.svg --target <venue>     # venue: neurips (default), icml, cvpr, …-col, or 5.5in
+   python3 "$SKILL_DIR/scripts/render_svg.py" <name>.svg --target <venue> [--paper main.tex]   # venue: neurips (default), icml, cvpr, …-col, or 5.5in
    ```
+   With `--paper` (needed once; the setup is stored in the SVG) `$…$` math uses the paper's math font and macros.
    This writes `<name>.png`, `<name>.debug.png` (coordinate grid plus numbered boxes around each issue `E#`/`W#`) and
    `<name>.preview.png` (the figure at printed size), and prints errors and warnings with coordinates.
 2. **Look at the images yourself.** Read `<name>.debug.png` first, then `<name>.preview.png`. The lint cannot judge composition, so the visual pass is required.
@@ -102,7 +105,7 @@ After round 3, stop iterating even if minor issues remain, and list them in the 
 python3 "$SKILL_DIR/scripts/render_svg.py" <name>.svg --target <venue> --export
 ```
 
-This produces `<name>.pdf` (vector, page size equals the printed width, so its text sizes are the real printed sizes), a high-res `<name>.png` (3 px/u, or `--dpi 300`), and PDF checks: single page, fonts embedded (no Type 3), no rasterised content, and the PDF matching the PNG. If the renderer would embed Type 3 fonts (Chromium does this for CFF fonts such as Inter `.otf`, and NeurIPS/ICML-style checkers flag them), the text is converted to vector outlines automatically (`--pdf-text auto|fonts|outline`). It also removes the review images. Then give the user:
+This produces `<name>.pdf` (vector, page size equals the printed width, so its text sizes are the real printed sizes), a high-res `<name>.png` (3 px/u, or `--dpi 300`), and PDF checks: single page, fonts embedded, only Type 1 / TrueType fonts (Type 3 is an error), no rasterised content, and the PDF matching the PNG. If the renderer would embed Type 3 fonts for the sans text (Chromium does this for CFF fonts such as Inter `.otf` or TeX Gyre `.otf`, and NeurIPS/ICML-style checkers reject them), that text is converted to vector outlines automatically (`--pdf-text auto|fonts|outline`). `$…$` math is stamped in afterwards from pdflatex output, so the PDF carries the real Type 1 math fonts (e.g. CMMI6 with CMMI5 scripts); the report lists the fonts and their printed sizes. It also removes the review images. Then give the user:
 
 - the files (`.svg` source, `.pdf` for LaTeX, `.png` for slides/preview);
 - a LaTeX snippet matching the target width:
@@ -113,7 +116,7 @@ This produces `<name>.pdf` (vector, page size equals the printed width, so its t
     \caption{...}\label{fig:overview}
   \end{figure*}
   ```
-- a short report: the target and smallest printed font size, critique rounds run and what changed, and any accepted warnings.
+- a short report: the target and smallest printed font size (and the math base/script sizes, if any), critique rounds run and what changed, and any accepted warnings.
 
 ## Quality bar (what "done" means)
 
@@ -122,4 +125,5 @@ This produces `<name>.pdf` (vector, page size equals the printed width, so its t
 - Every arrow starts and ends on a border, never runs through a module or label, and follows rounded orthogonal routes.
 - One clear focal point (the contribution), consistent role colours, and a legend only for non-obvious encodings.
 - Faithful to the paper: module names, symbols and tensor shapes match the text or code. Nothing is invented. Mark anything assumed.
-- Deliverables are a single self-contained SVG, a vector PDF (embedded or outlined fonts, never Type 3), and a PNG, all rendered locally with no cloud APIs.
+- Math is typeset by LaTeX in the paper's math font and notation, with LaTeX script sizes (≥ 5pt printed).
+- Deliverables are a single self-contained SVG, a vector PDF (Type 1/TrueType or outlined fonts, never Type 3), and a PNG, all rendered locally with no cloud APIs.

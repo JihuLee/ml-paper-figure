@@ -53,12 +53,13 @@ smallest printed font size and any accepted warnings.
 1. **Plan.** Extract stages, modules, tensor shapes and flows. Fix the canvas (2 SVG units = 1 printed pt for the
    target venue) and every module's box before drawing.
 2. **Draft.** Write one self-contained SVG from tested primitives: role-colored arrowheads, vector frozen/trainable
-   badges, trapezoids, stacks and mini visualizations. `svg_geom.py` computes the exact paths.
+   badges, trapezoids, stacks and mini visualizations. `svg_geom.py` computes the exact paths. Math is written as
+   LaTeX between `$…$` (`scores $S[i,v,p]$`) and typeset by LaTeX in the paper's math font and macros.
 3. **Render & critique.** `render_svg.py` lints the geometry (overflowing text, arrows through boxes, floating
-   arrowheads, near-misalignment, font size in printed pt) and writes a debug overlay and a printed-size preview for
-   the agent to inspect. At most three rounds.
+   arrowheads, near-misalignment, font size in printed pt, math script sizes) and writes a debug overlay and a
+   printed-size preview for the agent to inspect. At most three rounds.
 4. **Export.** Vector PDF sized to the venue's printed width, high-res PNG, and PDF checks (single page, no
-   rasterization, no Type 3 fonts).
+   rasterization, Type 1/TrueType fonts only). Math keeps its real Type 1 fonts (e.g. CMMI6 with CMMI5 scripts).
 
 ## Layout
 
@@ -70,6 +71,7 @@ skills/ml-paper-figure/
 │   └── svg-primitives.md        # copy-paste <defs>, text and path formulas, ML shape templates
 ├── scripts/
 │   ├── render_svg.py            # lint, render (PNG/PDF), review images, PDF checks
+│   ├── tex_math.py              # $…$ math: paper preamble/macros, latex -> dvisvgm, pdflatex snippets for the PDF
 │   └── svg_geom.py              # exact coordinates for paths, shapes, grids, labels
 └── assets/                      # primitives gallery, complete example figure
 examples/uncertainty-aware/      # verification run: input → blueprint → 3 rounds → outputs
@@ -81,6 +83,10 @@ docs/                            # diagram above (HTML source + PNGs)
 - Python 3.8+ and one SVG renderer. The script auto-detects them in this order: Chromium via
   [Playwright](https://playwright.dev/python/) (recommended; needed for exact geometry lint), `rsvg-convert`, Inkscape,
   cairosvg, resvg (PNG only).
+- For `$…$` math: a TeX distribution with `latex`, `pdflatex`, `dvisvgm` and `kpsewhich` (TeX Live, MiKTeX or
+  TinyTeX; `dvisvgm` is a separate package in TinyTeX), and PyMuPDF (`pip install pymupdf`) to embed the real math
+  fonts in the PDF. Without PyMuPDF the math in the PDF stays as glyph outlines; without TeX the lint reports the math
+  as untypeset. Nothing is installed automatically.
 - Optional: poppler-utils (PDF checks and Type 3 → outline conversion) and Pillow (PNG/PDF comparison).
 - Node.js 22.20+ for `npx skills` only.
 
@@ -93,6 +99,8 @@ Run from the skill folder (`~/.claude/skills/ml-paper-figure` after install):
 ```bash
 python3 scripts/render_svg.py fig.svg --target neurips            # review: PNG + debug + preview + lint report
 python3 scripts/render_svg.py fig.svg --target cvpr --export      # final: vector PDF + high-res PNG + PDF checks
+python3 scripts/render_svg.py fig.svg --target cvpr-col --paper ../paper/main.tex   # $…$ math in the paper's setup
+python3 scripts/tex_math.py --paper ../paper/main.tex --show       # the math preamble and macros taken from the paper
 python3 scripts/svg_geom.py elbow 382,140 412,100 --mode hvh --mid 390 --arrow --marker ah-proposed
 ```
 
@@ -101,9 +109,10 @@ python3 scripts/svg_geom.py elbow 382,140 412,100 --mode hvh --mid 390 --arrow -
 
 ## Status
 
-Tested: the Chromium (Node Playwright) path for exact lint, rendering, debug overlays and vector PDF; approximate lint
-without a browser (`--no-browser`); Type 3 outlining. Implemented but not yet tested: the rsvg-convert, Inkscape,
-cairosvg and resvg backends and the Python Playwright driver. The repository follows the skills CLI's documented
+Tested: the Chromium path (Node and Python Playwright) for exact lint, rendering, debug overlays and vector PDF;
+approximate lint without a browser (`--no-browser`); Type 3 outlining; `$…$` math with TinyTeX (latex, pdflatex,
+dvisvgm 3.6) and PyMuPDF. Implemented but not yet tested: the rsvg-convert, Inkscape, cairosvg and resvg backends, and
+the PyMuPDF fallback that builds the SVG glyphs without dvisvgm. The repository follows the skills CLI's documented
 `skills/<name>/SKILL.md` layout; `npx skills add` itself has not been run against it in our test environment.
 
 <sub>Architecture diagram made with stack-diagram (source: <a href="docs/architecture.html">docs/architecture.html</a>).

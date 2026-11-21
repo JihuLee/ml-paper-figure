@@ -106,21 +106,23 @@ Rules:
 ## 5. Typography
 
 Root font stack (system fonts, no web fonts): `font-family="Inter, 'Helvetica Neue', Helvetica, Arial, 'Liberation Sans', sans-serif"`.
-Math variables use the `.t-math` class, a serif italic stack (`'STIX Two Text', 'Times New Roman', 'Liberation Serif', serif`)
-that matches the LaTeX body. If Inter is missing the figure falls back to Helvetica/Arial, which run about 5 % narrower,
-so a layout planned with Inter widths stays safe.
+Math is real LaTeX: write it between `$…$` in a `<text>` and the render script typesets it in the paper's math font
+(Computer Modern unless the paper loads another math package) with the paper's macros (svg-primitives.md §2). If Inter
+is missing the figure falls back to Helvetica/Arial, which run about 5 % narrower, so a layout planned with Inter
+widths stays safe.
 
 | Tier | Class | Size | Printed (2u/pt) | Weight | Colour | Use |
 |---|---|---|---|---|---|---|
 | T1 | `.t-stage` | 17u | 8.5pt | 600 | `#1F2933` | stage titles `(a) …` |
 | T2 | `.t-mod` | 15u | 7.5pt | 600 | `#1F2933` | module names |
 | T3 | `.t-sub`, `.t-dim` | 13u | 6.5pt | 400 | `#4B5563` / `#6B7280` | sub-labels, tensor shapes, edge labels, legend |
-| floor | — | 12.5u | 6.2pt | 400 | `#6B7280` | tiny tags (`×N`) only; sub/superscripts use T3 (13u) |
+| floor | — | 12.5u | 6.2pt | 400 | `#6B7280` | tiny tags (`×N`) only |
+| scripts | (LaTeX) | — | ≥ 5pt | — | as the line | sub/superscripts inside `$…$`: LaTeX's script size for the base (6pt → 5pt, 8pt → 6pt), never set by hand |
 
 - At most 4 sizes per figure (3 is typical). Captions print at ~9pt, so figure text stays at or below that. On an 800u NeurIPS canvas 1u = 0.495pt, so 12u would print at 5.9pt; hence the 12.5u floor.
 - **Module names** are nouns in Title Case, ≤ 2 lines, ~14 characters per line (`Vision Encoder`, `Cross-Attn`). Use exactly the paper's names.
 - **Tensor shapes** take the form `(B, C, H, W)`, with comma + space; use `×` (U+00D7) for products such as `H/16×W/16`. Show them at stage boundaries and wherever the shape changes, not on every edge.
-- **Symbols** follow the paper's notation: `x`, `z`, `ŷ`, `ℒ_task`. Set a single-letter variable in `.t-math`; draw sub/superscripts with `<tspan font-size="13" dy="3">` (T3, so no extra size tier) and undo the shift if text follows.
+- **Symbols** follow the paper's notation exactly, as LaTeX in `$…$`: `$x$`, `$\hat{y}$`, `$\mathcal{L}_{\text{task}}$`, `$c_{FA}$`. Render with `--paper main.tex` so the paper's macros and math font are used. Math in a line counts toward the size of that line's tier, not as an extra tier.
 - Line height is 1.25 × size. Avoid all-caps, underline and italics for emphasis.
 
 ## 6. Shapes & ML metaphors

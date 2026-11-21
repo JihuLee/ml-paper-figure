@@ -49,7 +49,6 @@ attributes on each `<text>`. (A CSS `fill` in a class would silently override th
       .t-mod   { font-size: 15px; font-weight: 600; }
       .t-sub   { font-size: 13px; font-weight: 400; }
       .t-dim   { font-size: 13px; font-weight: 400; }
-      .t-math  { font-family: 'STIX Two Text', 'Times New Roman', 'Liberation Serif', 'DejaVu Serif', serif; font-style: italic; font-weight: 400; }
     </style>
     <marker id="ah-data" viewBox="0 0 10 8" refX="7.5" refY="4" markerWidth="8" markerHeight="6.4" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0L10 4L0 8L2.5 4Z" fill="#4B5768"/></marker>
     <marker id="ah-frozen" viewBox="0 0 10 8" refX="7.5" refY="4" markerWidth="8" markerHeight="6.4" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0L10 4L0 8L2.5 4Z" fill="#3A6A9E"/></marker>
@@ -100,16 +99,51 @@ Width estimates (Inter): semibold 15u ≈ 8.7u per character, regular 13u ≈ 7.
 run wider. For exact numbers use `svg_geom.py width "Vision Encoder" --fs 15 --weight 600` → `109.4`, or
 `svg_geom.py label x y w h "Mean|Head"`, which prints the `<text>` lines plus the resulting padding (`OK`/`TIGHT`).
 
-Math and tensor notation:
+### Math: LaTeX between `$…$`
+
+Write math as LaTeX between `$…$` inside an ordinary `<text>`, in the paper's own notation and macros. Text outside
+the dollars stays in the figure's sans font; `render_svg.py` typesets each math segment with LaTeX on every run.
 
 ```xml
-<!-- ℒ_task in a pill centred at cy: baseline = cy + 3.5 (the 3u subscript drop lowers the block, so sit 1.75u higher than the usual 0.35·fs) -->
-<text x="408" y="410.5" text-anchor="middle" font-size="15" fill="#A84B61"><tspan class="t-math">L</tspan><tspan font-size="13" dy="3">task</tspan></text>
-<!-- ŷ : precomposed U+0177 in math italic (avoid combining accents, which misplace in some fonts) -->
-<text x="200" y="120" font-size="15"><tspan class="t-math">ŷ</tspan></text>
-<!-- shape annotation -->
+<!-- mixed line: the sans words and the math share one baseline (y), placed and centred as one line -->
+<text class="t-sub" x="114" y="66" text-anchor="middle" fill="#4B5563">scores $S[i,v,p]$</text>
+<!-- loss in a pill centred at cy: the usual baseline y = cy + 0.35·fs; the lint measures the subscript's ink -->
+<text class="t-mod" x="408" y="412.25" text-anchor="middle" fill="#A84B61">$\mathcal{L}_{\text{task}}$</text>
+<!-- accents, Greek, operators: plain LaTeX, or the paper's macros when rendered with --paper -->
+<text class="t-mod" x="200" y="120" text-anchor="middle">$\hat{y}$</text>
+<text class="t-dim" x="464" y="71" text-anchor="middle" fill="#6B7280">$z = \mu + \sigma \odot \epsilon$</text>
+<!-- shape annotation: sans, unless the paper writes the shape as math -->
 <text class="t-dim" x="144" y="214" text-anchor="middle" fill="#6B7280">(B, N, D)</text>
 ```
+
+What the script does with such a `<text>`: it keeps it as the source (hidden, `data-tex="src" display="none"`) and
+writes a generated `<g data-tex="out" class="tex-line">` right after it. That group holds one `<text>` per sans segment
+and one `<g class="tex-math">` of glyph paths (latex → dvisvgm) per math segment, all on the source's baseline and
+aligned by its `text-anchor`. The widths come from TeX's box metrics and the sans text's measured width (in Chromium,
+with the TeX font directories added to fontconfig). In the exported PDF the math is drawn from pdflatex output, so
+it embeds the real Type 1 fonts (CMMI6, CMR5, …) instead of outlines.
+
+Rules:
+- **Edit only the source `<text>`** (content, `x`, `y`, class, fill). The generated group is rebuilt whenever the source,
+  the `--target` width or the TeX setup changes; edits inside it are lost.
+- One line per `<text>`, and no `<tspan>` in a line that contains math. Write a literal dollar sign as `\$`.
+- **Sizes**: the math base size is the text's printed size (font-size in u × pt per u at `--target`), and
+  sub/superscripts get LaTeX's script sizes: 6pt → 5pt, 7pt → 5pt, 8pt → 6pt, 9pt → 6pt, 10pt → 7pt (other sizes:
+  0.7× and 0.5×, never below 5pt). The lint reports each math group's printed base and script size; scripts below
+  5pt are an error, below 6pt a warning. Fix it with a larger base size or a `\DeclareMathSizes` line (`--math`),
+  never by shrinking, raising or redrawing the scripts by hand.
+- **Fonts and notation**: render with `--paper path/to/main.tex`. The script reads the preamble, the `\input` macro
+  files and local `.sty`/`.cls` files, picks the math setup (Computer Modern unless the paper loads e.g.
+  `newtxmath`/`mathptmx`; `\usepackage{times}` changes only the text font, so CVPR math stays Computer Modern),
+  copies math packages such as `amsmath`, `bm`, and every `\newcommand`/`\DeclareMathOperator`. If the paper writes
+  `c_{FA}`, write `$c_{FA}$`, not `$c_{\mathrm{FA}}$`. The setup is stored in `<metadata id="tex-setup">`, so later
+  runs reuse it. Override with `--math cm|newtx|mathptmx|newpx|...` or verbatim LaTeX; `python3 scripts/tex_math.py
+  --paper main.tex --show` prints the preamble.
+- Never fake math: no serif-italic classes, `<tspan dy>` subscripts, smaller separate text for indices or Unicode
+  italic letters.
+- Needs `latex` + `dvisvgm` (TeX Live, MiKTeX or TinyTeX) and, for real fonts in the PDF, `pdflatex` + PyMuPDF
+  (`pip install pymupdf`). `--list-backends` shows what is found. Without them the script reports the untypeset math
+  as an error instead of installing anything.
 
 ## 3. Boxes & containers
 
