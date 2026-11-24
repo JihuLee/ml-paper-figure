@@ -128,26 +128,58 @@ def texmf_font_dirs():
     return dirs
 
 
-def fontconfig_env(td):
-    """Environment with a temporary FONTCONFIG_FILE that adds the TeX font dirs to the system configuration.
+def truetype_families(dirs):
+    """Family names of the TrueType (glyf-outline) fonts in dirs, read with fc-scan."""
+    fc = shutil.which("fc-scan")
+    fams = set()
+    if not fc:
+        return fams
+    for d in dirs:
+        try:
+            r = subprocess.run([fc, "--format", "%{fontformat}\t%{family[0]}\n", d], capture_output=True, text=True, timeout=120)
+        except Exception:
+            continue
+        for line in r.stdout.splitlines():
+            fmt, _, fam = line.partition("\t")
+            if fmt.strip() == "TrueType" and fam.strip():
+                fams.add(fam.strip())
+    return fams
+
+
+def fontconfig_env(td, extra=(), tex=True):
+    """Environment with a temporary FONTCONFIG_FILE that adds font dirs to the system configuration.
 
     Chromium only sees fontconfig fonts, so a figure set in e.g. 'TeX Gyre Heros' would otherwise be measured and
-    drawn with a fallback font (wrong widths, false overflow errors). Returns (env, dirs); env is None when there is
-    nothing to add.
+    drawn with a fallback font (wrong widths, false overflow errors). tex=True adds the TeX tree's font dirs; extra
+    adds user dirs (render_svg.py --font-dir). Chromium embeds CFF-flavoured OpenType (.otf) fonts as Type 3 in PDFs
+    but TrueType fonts as TrueType, so for every family that a user dir provides as TrueType, the CFF copies of that
+    family are rejected and the TrueType version is used. Returns (env, dirs, preferred_families); env is None when
+    there is nothing to add.
     """
-    dirs = texmf_font_dirs()
+    dirs = texmf_font_dirs() if tex else []
+    user = []
+    for d in extra or ():
+        s = str(Path(d).expanduser().resolve())
+        if s not in dirs and s not in user:
+            user.append(s)
+    dirs = dirs + user
     if not dirs:
-        return None, []
+        return None, [], []
+    prefer = sorted(truetype_families(user)) if user else []
     conf = Path(td) / "fonts.conf"
     base = os.environ.get("FONTCONFIG_FILE")
     include = base if base and Path(base).exists() else "/etc/fonts/fonts.conf"
     body = "\n".join(f"  <dir>{html.escape(d)}</dir>" for d in dirs)
+    if prefer:
+        pats = "\n".join(f'      <pattern><patelt name="family"><string>{html.escape(f)}</string></patelt>'
+                         f'<patelt name="fontformat"><string>CFF</string></patelt></pattern>' for f in prefer)
+        body += f"\n  <selectfont>\n    <rejectfont>\n{pats}\n    </rejectfont>\n  </selectfont>"
     conf.write_text('<?xml version="1.0"?>\n<!DOCTYPE fontconfig SYSTEM "fonts.dtd">\n<fontconfig>\n'
                     f'  <include ignore_missing="yes">{html.escape(include)}</include>\n{body}\n</fontconfig>\n',
                     encoding="utf-8")
     env = dict(os.environ)
     env["FONTCONFIG_FILE"] = str(conf)
-    return env, dirs
+    return env, dirs, prefer
 
 
 # ----------------------------------------------------------------------------- paper preamble

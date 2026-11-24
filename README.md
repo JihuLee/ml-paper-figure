@@ -5,10 +5,10 @@ self-contained SVG, a vector PDF for LaTeX, and a high-res PNG. Instead of writi
 blueprint, drafts, then renders and critiques its own output (up to three rounds) with an offline lint script before
 exporting.
 
-![Example Figure 1 produced by the skill](examples/uncertainty-aware/figure1_uam.png)
+![Example Figure 1 produced by the skill](skills/ml-paper-figure/assets/example-figure1.png)
 
-<sub>Verification run: frozen encoder → proposed module → decoder with dashed loss paths, NeurIPS width, 0 lint issues.
-See the <a href="examples/uncertainty-aware/critique-log.md">critique log</a>.</sub>
+<sub>Example: frozen encoder → proposed module → decoder with dashed loss paths, at NeurIPS width. The first verification
+run is recorded in the <a href="examples/uncertainty-aware/critique-log.md">critique log</a>.</sub>
 
 ## Install
 
@@ -100,6 +100,7 @@ Run from the skill folder (`~/.claude/skills/ml-paper-figure` after install):
 python3 scripts/render_svg.py fig.svg --target neurips            # review: PNG + debug + preview + lint report
 python3 scripts/render_svg.py fig.svg --target cvpr --export      # final: vector PDF + high-res PNG + PDF checks
 python3 scripts/render_svg.py fig.svg --target cvpr-col --paper ../paper/main.tex   # $…$ math in the paper's setup
+python3 scripts/render_svg.py fig.svg --export --font-dir ~/fonts/ttf               # keep real fonts: TrueType copies of .otf fonts
 python3 scripts/tex_math.py --paper ../paper/main.tex --show       # the math preamble and macros taken from the paper
 python3 scripts/svg_geom.py elbow 382,140 412,100 --mode hvh --mid 390 --arrow --marker ah-proposed
 ```
@@ -110,10 +111,11 @@ python3 scripts/svg_geom.py elbow 382,140 412,100 --mode hvh --mid 390 --arrow -
 ## Status
 
 Tested: the Chromium path (Node and Python Playwright) for exact lint, rendering, debug overlays and vector PDF;
-approximate lint without a browser (`--no-browser`); Type 3 outlining; `$…$` math with TinyTeX (latex, pdflatex,
-dvisvgm 3.6) and PyMuPDF. Implemented but not yet tested: the rsvg-convert, Inkscape, cairosvg and resvg backends, and
-the PyMuPDF fallback that builds the SVG glyphs without dvisvgm. The repository follows the skills CLI's documented
-`skills/<name>/SKILL.md` layout; `npx skills add` itself has not been run against it in our test environment.
+approximate lint without a browser (`--no-browser`); Type 3 outlining with pdftocairo; `--font-dir` (TrueType fonts
+replace CFF fonts of the same family); the `glyph-fallback`, `verbose-label` and `plain-component` lints; `$…$` math
+with TinyTeX (latex, pdflatex, dvisvgm 3.6) and PyMuPDF; install and update with `npx skills`. Implemented but not yet
+tested: the rsvg-convert, Inkscape, cairosvg and resvg backends, the PyMuPDF fallback that builds the SVG glyphs
+without dvisvgm, and the PyMuPDF outliner used when pdftocairo is missing.
 
 <sub>Architecture diagram made with stack-diagram (source: <a href="docs/architecture.html">docs/architecture.html</a>).
 Icons: devicon and Lucide.</sub>

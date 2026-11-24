@@ -446,6 +446,38 @@ JS_ANALYZE = r"""async (opt) => {
     texts.push(T); maths.push(T);
   }
 
+  // ---- glyph coverage: a character the resolved font lacks is drawn with a fallback font
+  //      (test: with the font first in the stack, the glyph's width differs from every bare fallback stack)
+  const GENERIC = new Set(['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui', 'math', 'emoji',
+    'ui-serif', 'ui-sans-serif', 'ui-monospace', 'ui-rounded']);
+  const BASES = ['monospace', 'serif', 'sans-serif'];
+  const famsOf = s => s.split(',').map(f => f.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
+  const wOf = (txt, font) => { cvs.font = font; return cvs.measureText(txt).width; };
+  const famOk = new Map(), glyphOk = new Map();
+  const installed = (fam, st) => { const k = fam + '|' + st;
+    if (!famOk.has(k)) { const s = 'mmmmmmmmmmlli1WQ@#';
+      famOk.set(k, BASES.some(b => Math.abs(wOf(s, `${st} 40px "${fam}", ${b}`) - wOf(s, `${st} 40px ${b}`)) > 0.01)); }
+    return famOk.get(k); };
+  const hasGlyph = (fam, ch, st) => { const k = fam + '|' + st + '|' + ch;
+    if (!glyphOk.has(k)) glyphOk.set(k, BASES.some(b => Math.abs(wOf(ch, `${st} 40px "${fam}", ${b}`) - wOf(ch, `${st} 40px ${b}`)) > 0.01));
+    return glyphOk.get(k); };
+  for (const T of texts) {
+    if (T.math) continue;
+    const miss = new Map();
+    for (const [c, e] of charsOf(T.el, 0)) {
+      const code = c.charCodeAt(0);
+      if (/\s/.test(c) || (code >= 0xD800 && code <= 0xDFFF)) continue;
+      const cs = getComputedStyle(e), st = `${cs.fontStyle} ${cs.fontWeight}`;
+      const first = famsOf(cs.fontFamily).find(f => !GENERIC.has(f.toLowerCase()) && installed(f, st));
+      if (!first || wOf(c, `${st} 40px "${first}", serif`) <= 0.01) continue;
+      if (!hasGlyph(first, c, st)) { if (!miss.has(first)) miss.set(first, new Set()); miss.get(first).add(c); }
+    }
+    for (const [f, set] of miss) {
+      const list = [...set].map(c => `"${c}" (U+${c.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')})`).join(', ');
+      add('warn', 'glyph-fallback', `${T.name}: ${list} not in ${f}, so it renders in a fallback font (another style; a CFF fallback also becomes Type 3 in Chromium PDFs). Write symbols as $…$ math, or give that <tspan> a font-family that has the glyph`, T.box);
+    }
+  }
+
   // ---- connectors
   const edges = [];
   for (const el of svg.querySelectorAll('path, line, polyline')) {
@@ -540,6 +572,29 @@ JS_ANALYZE = r"""async (opt) => {
     if (hit) add('warn', 'text-over-shape', `${T.name} overlaps ${S.name}`, isect(T.box, S.box));
   }
 
+  // ---- box labels are names, not sentences; model components use their conventional shape
+  const short = s => (s.length > 48 ? s.slice(0, 47) + '…' : s);
+  const COMPONENT = /\b(encoders?|decoders?|backbones?|vlms?|llms?|lmms?|mllms?|vit|clip|siglip|dino(?:v2)?|bert|gpt|llama|transformers?|u-?net|resnet|cnn|mlp|heads?|classifiers?|logistic|probes?|embeddings?|projectors?|adapters?|lora|tokeni[sz]ers?|language model|vision model|foundation model)\b/i;
+  const byBox = new Map();
+  for (const T of texts) {
+    if (!T.container || T.onEdge) continue;
+    if (!byBox.has(T.container)) byBox.set(T.container, []);
+    byBox.get(T.container).push(T);
+  }
+  for (const [C, Ts] of byBox) {
+    if (C.el.closest('.legend')) continue;
+    const holdsMore = shapes.some(S => S !== C && !S.bg && S.area < C.area * 0.95 && !S.el.closest('.badge')
+      && inBox(C.box, (S.box.x0 + S.box.x1) / 2, (S.box.y0 + S.box.y1) / 2));
+    if (holdsMore) continue;   // a card, or a box that already shows something besides its label
+    const txt = Ts.map(T => T.math ? '$' + (T.el.dataset.tex || '') + '$' : (T.el.textContent || '').replace(/\s+/g, ' ').trim()).join(' ').trim();
+    const words = Ts.reduce((n, T) => n + (T.math ? 1 : (T.el.textContent || '').trim().split(/\s+/).filter(Boolean).length), 0);
+    const lines = new Set(Ts.map(T => T.line || T.el)).size;
+    if (words > opt.maxLabelWords || lines > opt.maxLabelLines)
+      add('warn', 'verbose-label', `${C.name} holds ${words} words on ${lines} lines ("${short(txt)}"); a box label is a name (<= 3 words, <= 2 lines). Show the content as a picture or move the explanation to the caption`, C.box);
+    else if (C.tag === 'rect' && COMPONENT.test(txt))
+      add('warn', 'plain-component', `${C.name} "${short(txt)}" is drawn as a plain text box; use the conventional shape for this component (design-system.md §6: layer stack for a pretrained model, small trapezoid with its function for a head, segmented bar for a feature vector)`, C.box);
+  }
+
   // ---- connectors vs shapes / texts
   for (const E of edges) {
     const ends = [E.start, E.end];
@@ -605,7 +660,7 @@ JS_ANALYZE = r"""async (opt) => {
 
   // ---- near-misalignment (things that are almost, but not exactly, aligned)
   const al = [];
-  const bx = shapes.filter(S => !S.bg && Math.min(S.box.x1 - S.box.x0, S.box.y1 - S.box.y0) >= 8 && !S.el.closest('.stack, .cuboid, .badge, .legend, [class*="mini"]'));
+  const bx = shapes.filter(S => !S.bg && Math.min(S.box.x1 - S.box.x0, S.box.y1 - S.box.y0) >= 8 && !S.el.closest('.stack, .cuboid, .layers, .vector, .badge, .legend, [class*="mini"]'));
   for (let i = 0; i < bx.length; i++) for (let j = i + 1; j < bx.length; j++) {
     const a = bx[i].box, b = bx[j].box, ha = a.y1 - a.y0, hb = b.y1 - b.y0, wa = a.x1 - a.x0, wb = b.x1 - b.x0;
     const xo = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0), yo = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0);
@@ -1251,17 +1306,40 @@ def pdf_font_types(pdf):
     return out
 
 
-def outline_pdf_text(pdf, chromium_kind, chromium_path):
-    """Replace the PDF's fonts by vector glyph outlines: pdftocairo -svg, then Chromium prints the outlined SVG.
+def outline_tool():
+    """What can turn PDF text into glyph outlines here: 'pdftocairo' (poppler), 'pymupdf', or None."""
+    if shutil.which("pdftocairo"):
+        return "pdftocairo"
+    try:
+        tex_math.get_pymupdf()
+        return "pymupdf"
+    except Exception:
+        return None
+
+
+def outline_pdf_text(pdf, chromium_kind, chromium_path, tool=None):
+    """Replace the PDF's fonts by vector glyph outlines: PDF -> SVG with text as paths (pdftocairo, or PyMuPDF when
+    poppler is missing), then Chromium prints the outlined SVG.
 
     Chromium/Skia embeds CFF-flavoured OpenType fonts (e.g. Inter .otf) as Type 3, which many camera-ready
     checkers reject. Outlined text is resolution-independent and font-free.
     """
+    tool = tool or outline_tool()
     with tempfile.TemporaryDirectory(prefix="mlfig_") as td:
         osvg, opdf = Path(td) / "outlined.svg", Path(td) / "outlined.pdf"
-        r = run(["pdftocairo", "-svg", pdf, str(osvg)])
-        if r.returncode != 0 or not osvg.exists():
-            raise RuntimeError(f"pdftocairo -svg failed: {(r.stderr or '').strip()[-300:]}")
+        if tool == "pdftocairo":
+            r = run(["pdftocairo", "-svg", pdf, str(osvg)])
+            if r.returncode != 0 or not osvg.exists():
+                raise RuntimeError(f"pdftocairo -svg failed: {(r.stderr or '').strip()[-300:]}")
+        elif tool == "pymupdf":
+            fz = tex_math.get_pymupdf()
+            doc = fz.open(pdf)
+            try:
+                osvg.write_text(doc[0].get_svg_image(text_as_path=True), encoding="utf-8")
+            finally:
+                doc.close()
+        else:
+            raise RuntimeError("no PDF outliner: install poppler-utils (pdftocairo) or PyMuPDF")
         text = osvg.read_text(encoding="utf-8")
         m = re.search(r'<svg[^>]*\swidth="([\d.]+)(?:pt)?"[^>]*\sheight="([\d.]+)(?:pt)?"', text)
         if not m:
@@ -1316,7 +1394,8 @@ def check_pdf(pdf, wpt, hpt, png, first_family):
     t3 = [f["name"] for f in fonts if "Type 3" in f["type"]]
     if t3:
         issues.append(issue("error", "pdf-type3", f"PDF contains Type 3 fonts ({', '.join(sorted(set(t3)))[:120]}); "
-                            "camera-ready checkers reject them. Use --pdf-text auto/outline, or a TrueType/Type 1 font"))
+                            "camera-ready checkers reject them. Use --pdf-text auto/outline (needs pdftocairo or PyMuPDF), or give the renderer "
+                            "TrueType versions of the fonts with --font-dir"))
     info["font_types"] = sorted({f"{re.sub(r'^[A-Z]{6}[+]', '', f['name'])} ({f['type']})" for f in fonts})
     info["fonts"] = sorted({re.sub(r"^[A-Z]{6}\+", "", f["name"]) for f in fonts})
     if tex_math.tex_env().get("pymupdf"):
@@ -1719,6 +1798,9 @@ def main(argv=None):
     ap.add_argument("--no-macros", action="store_true", help="with --paper, do not copy the paper's macro definitions")
     ap.add_argument("--no-typeset", action="store_true", help="do not (re)typeset $...$ math")
     ap.add_argument("--no-tex-fonts", action="store_true", help="do not add the TeX font directories to fontconfig for Chromium")
+    ap.add_argument("--font-dir", action="append", default=[], metavar="DIR",
+                    help="extra font folder for the renderers (repeatable). TrueType fonts here replace CFF (.otf) fonts of the "
+                         "same family, so Chromium PDFs embed TrueType instead of Type 3")
     ap.add_argument("--keep-review", action="store_true", help="with --export, keep .debug/.preview PNGs")
     ap.add_argument("--strict", action="store_true", help="exit 1 on warnings too")
     ap.add_argument("--json", help="write the full report as JSON to this path")
@@ -1734,7 +1816,7 @@ def main(argv=None):
         for k in ("chromium", "rsvg", "inkscape", "cairosvg", "resvg"):
             v = backends.get(k)
             print(f"  {k:9s} {'-' if not v else (v[1] if isinstance(v, tuple) else v)}")
-        for tool in ("pdfinfo", "pdffonts", "pdfimages", "pdftoppm"):
+        for tool in ("pdfinfo", "pdffonts", "pdfimages", "pdftoppm", "pdftocairo"):
             print(f"  {tool:9s} {shutil.which(tool) or '-'}")
         print("LaTeX math ($...$ in <text>):")
         tenv = tex_math.tex_env()
@@ -1758,12 +1840,20 @@ def main(argv=None):
     tname, tpt, tdesc = parse_target(a.target)
 
     notes = []
-    if not a.no_tex_fonts and (backends.get("chromium") or backends.get("rsvg") or backends.get("inkscape")):
+    bad_dirs = [d for d in a.font_dir if not Path(d).expanduser().is_dir()]
+    if bad_dirs:
+        print(f"error: --font-dir is not a folder: {', '.join(bad_dirs)}", file=sys.stderr)
+        return 2
+    if (not a.no_tex_fonts or a.font_dir) and (backends.get("chromium") or backends.get("rsvg") or backends.get("inkscape")):
         fc_td = tempfile.mkdtemp(prefix="mlfig_fc_")
         atexit.register(shutil.rmtree, fc_td, True)
-        fc_env, fc_dirs = tex_math.fontconfig_env(fc_td)
+        fc_env, fc_dirs, fc_prefer = tex_math.fontconfig_env(fc_td, extra=a.font_dir, tex=not a.no_tex_fonts)
         if fc_env:
             os.environ["FONTCONFIG_FILE"] = fc_env["FONTCONFIG_FILE"]
+            if a.font_dir:
+                notes.append(f"fonts: added {len(a.font_dir)} --font-dir folder(s)"
+                             + (f"; TrueType preferred over CFF for {', '.join(fc_prefer)}" if fc_prefer else
+                                "; no TrueType fonts found there"))
 
     static, meta = static_lint(svg_path)
     if meta.get("fatal"):
@@ -1827,7 +1917,7 @@ def main(argv=None):
 
     opt = {"step": 2.0, "edgeMargin": a.edge_margin, "minPad": a.min_pad, "tipOffset": a.tip_offset, "alignTol": a.align_tol,
            "targetPt": tpt, "targetName": tname, "minPt": a.min_pt, "errPt": a.err_pt, "textGap": 2.0, "endSkip": 3.0,
-           "mathScriptErrPt": tex_math.MIN_SCRIPT_PT}
+           "mathScriptErrPt": tex_math.MIN_SCRIPT_PT, "maxLabelWords": 8, "maxLabelLines": 3}
     analysis, written, geometry = None, {}, "approximate"
     issues = None
     chromium = backends.get("chromium")
@@ -1887,18 +1977,29 @@ def main(argv=None):
             pass
 
     pdf_info = {}
+    outline_issues = []
     if written.get("pdf"):
         types = pdf_font_types(written["pdf"])
         has_t3 = bool(types) and any("Type 3" in t for _, t in types)
         if a.pdf_text == "outline" or (a.pdf_text == "auto" and has_t3):
-            if chromium and shutil.which("pdftocairo"):
+            tool = outline_tool()
+            why = None
+            if chromium and tool:
                 try:
-                    outline_pdf_text(written["pdf"], chromium[0], a.chromium_path)
-                    pdf_info["text"] = "outlined (vector glyphs, no fonts)" + (" - replaced Type 3 fonts" if has_t3 else "")
+                    outline_pdf_text(written["pdf"], chromium[0], a.chromium_path, tool)
+                    pdf_info["text"] = (f"outlined with {tool} (vector glyphs, no fonts)"
+                                        + (" - replaced Type 3 fonts" if has_t3 else ""))
                 except Exception as e:
-                    notes.append(f"could not outline PDF text: {str(e).splitlines()[-1][:200]}")
+                    why = f"outlining with {tool} failed: {str(e).splitlines()[-1][:200]}"
             else:
-                notes.append("PDF text outlining needs Chromium (Playwright) + pdftocairo (poppler)")
+                why = ("no PDF outliner: needs Chromium (Playwright) plus pdftocairo (poppler-utils) or PyMuPDF"
+                       if not tool else "outlining needs Chromium (Playwright) to print the outlined page")
+            if why:
+                remedy = ("Install poppler-utils or PyMuPDF; or keep real fonts by giving the renderer TrueType versions "
+                          "of the figure fonts with --font-dir (CFF .otf fonts become Type 3 in Chromium PDFs); "
+                          "or render the PDF with rsvg-convert/inkscape (--backend)")
+                outline_issues.append(issue("error" if a.pdf_text == "outline" else "warn", "pdf-outline-unavailable",
+                                            f"PDF text was not outlined ({why}). {remedy}"))
         if "text" not in pdf_info:
             pdf_info["text"] = "embedded fonts"
         if stamp_job:
@@ -1924,6 +2025,7 @@ def main(argv=None):
         counts = {s: sum(1 for i in issues if i["sev"] == s) for s in ("error", "warn", "info")}
         outlined = pdf_info.get("text", "").startswith("outlined")
         p_issues, p_info = check_pdf(written["pdf"], pdf_wpt, pdf_hpt, written.get("png"), None if outlined else meta.get("first_family"))
+        p_issues = outline_issues + p_issues
         pdf_info.update(p_info)
         tag_issues(p_issues, counts)
         issues += p_issues

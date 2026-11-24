@@ -88,7 +88,7 @@
   <path id="e-gate-dec" class="edge" d="M 547 140 L 610 140" fill="none" stroke="#B5602A" stroke-width="1.6" marker-end="url(#ah-proposed)"/>
   <path id="e-dec-yhat" class="edge" d="M 688 140 L 714 140" fill="none" stroke="#3B806A" stroke-width="1.6" marker-end="url(#ah-train)"/>
   <path id="e-yhat-ltask" class="edge" d="M 736 160 L 736 212" fill="none" stroke="#A84B61" stroke-width="1.4" stroke-dasharray="5 3.5" marker-end="url(#ah-loss)"/>
-  <path id="e-head-lkl" class="edge" d="M 340 166 L 340 218 Q 340 226 348 226 L 612 226" fill="none" stroke="#A84B61" stroke-width="1.4" stroke-dasharray="5 3.5" marker-end="url(#ah-loss)"/>
+  <path id="e-head-lkl" class="edge" d="M 340 167 L 340 218 Q 340 226 348 226 L 612 226" fill="none" stroke="#A84B61" stroke-width="1.4" stroke-dasharray="5 3.5" marker-end="url(#ah-loss)"/>
 
   <!-- ===== (a) frozen encoder ===== -->
   <use id="img" xlink:href="#thumb-patches" x="28" y="120"/>
@@ -110,9 +110,9 @@
 <g data-tex="out" class="tex-line" data-tex-hash="6bf2c6bb878b" data-tex-src="84efe4f790c0"><g class="tex-math" data-tex="F" data-pt="7.425" data-script-pt="5.2" data-size="15" data-script-size="10.5051" data-x="242.413" data-y="178" data-wd="13.174" data-ht="10.250" data-dp="0.000" fill="#1F2933" transform="translate(242.413 178) scale(2.02778)"><g transform="translate(72 66.9452)"><g fill='#1f2933'><path d='M-69.47-69.327H-68.679C-68.116-69.327-68.02-69.238-68.02-68.994C-68.02-68.883-68.02-68.868-68.072-68.661C-68.087-68.617-68.094-68.595-68.094-68.573C-68.094-68.499-68.042-68.462-67.968-68.462C-67.872-68.462-67.865-68.499-67.828-68.632L-67.428-70.2C-67.421-70.222-67.399-70.333-67.399-70.348C-67.399-70.422-67.451-70.459-67.525-70.459C-67.628-70.459-67.636-70.415-67.673-70.281C-67.821-69.704-68.035-69.593-68.664-69.593H-69.404L-68.938-71.45C-68.878-71.679-68.871-71.702-68.56-71.702H-67.428C-66.445-71.702-66.26-71.465-66.26-70.851C-66.26-70.607-66.289-70.452-66.289-70.392S-66.267-70.267-66.164-70.267C-66.053-70.267-66.045-70.333-66.03-70.459L-65.897-71.746C-65.875-71.968-65.927-71.968-66.112-71.968H-70.062C-70.202-71.968-70.299-71.968-70.299-71.805C-70.299-71.702-70.21-71.702-70.062-71.702C-70.055-71.702-69.914-71.702-69.781-71.687C-69.625-71.672-69.611-71.657-69.611-71.583C-69.611-71.532-69.633-71.458-69.64-71.421L-70.609-67.552C-70.683-67.263-70.691-67.212-71.268-67.212C-71.393-67.212-71.49-67.212-71.49-67.056C-71.49-66.982-71.438-66.945-71.371-66.945C-71.157-66.945-70.609-66.975-70.395-66.975L-69.825-66.967C-69.633-66.967-69.426-66.945-69.241-66.945C-69.189-66.945-69.078-66.945-69.078-67.108C-69.078-67.212-69.167-67.212-69.337-67.212C-69.352-67.212-69.537-67.212-69.722-67.226C-69.877-67.241-69.951-67.248-69.951-67.352C-69.951-67.382-69.951-67.404-69.929-67.485L-69.47-69.327Z'/></g></g></g><!--/m--></g><!--/tex-->
   <text class="t-dim" x="249" y="194" text-anchor="middle" fill="#6B7280">N×D</text>
 
-  <rect id="head" x="298" y="114" width="84" height="52" rx="7" fill="#FDEBDC" stroke="#E79A5D" stroke-width="1.6"/>
-  <text class="t-mod" x="340" y="135.88" text-anchor="middle">Gaussian</text>
-  <text class="t-mod" x="340" y="154.62" text-anchor="middle">Head</text>
+  <path id="head" d="M 298 113 Q 298 108 302.96 108.59 L 377.04 117.41 Q 382 118 382 123 L 382 157 Q 382 162 377.04 162.59 L 302.96 171.41 Q 298 172 298 167 Z" fill="#FDEBDC" stroke="#E79A5D" stroke-width="1.6"/>
+  <text class="t-mod" x="337" y="135.88" text-anchor="middle">Gaussian</text>
+  <text class="t-mod" x="337" y="154.62" text-anchor="middle">Head</text>
 
   <rect id="sample" x="412" y="78" width="104" height="44" rx="7" fill="#FDEBDC" stroke="#E79A5D" stroke-width="1.6"/>
   <use xlink:href="#thumb-noise" transform="translate(421 87) scale(0.72)"/>
@@ -146,7 +146,7 @@
 
   <!-- ===== badges ===== -->
   <use class="badge" xlink:href="#badge-frozen" x="182" y="110"/>
-  <use class="badge" xlink:href="#badge-train" x="380" y="116"/>
+  <use class="badge" xlink:href="#badge-train" x="380" y="120"/>
   <use class="badge" xlink:href="#badge-train" x="686" y="92"/>
 
   <!-- ===== legend ===== -->

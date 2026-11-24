@@ -10,6 +10,8 @@ Commands (all coordinates in SVG user units, "u"):
   trapezoid  encoder / decoder shape (rounded path) + safe text area + ports
   stack      offset card stack (multi-head, channels, ensembles), back to front
   cuboid     isometric tensor block (front / top / side faces)
+  layers     pretrained / frozen model as a block of stacked layers
+  vector     feature vector: a bar split into cells (optionally shaded)
   grid       mini cell grid: noise | heat | attn | seg | patch
   bell       Gaussian bell-curve path (distribution / uncertainty glyph)
   label      centred (multi-line) <text> for a box + width-fit check
@@ -299,6 +301,58 @@ def cmd_cuboid(args):
           f"right port (side face mid) {f(x + w + dx)},{f(y + h / 2 - dy / 2)} -->")
 
 
+def cmd_layers(args):
+    """Pretrained / frozen model drawn as a block of stacked layers (data crosses the slabs in flow order)."""
+    x, y, w, h, n, pad, gap = args.x, args.y, args.w, args.h, args.n, args.pad, args.gap
+    slab = _mix(args.fill, args.stroke, 0.45)
+    print(f'<g class="layers">')
+    print(f'  <rect x="{f(x)}" y="{f(y)}" width="{f(w)}" height="{f(h)}" rx="{f(args.r)}" fill="{args.fill}" '
+          f'stroke="{args.stroke}" stroke-width="1.2"/>')
+    if args.flow == "lr":   # vertical slabs side by side
+        sw_ = (w - 2 * pad - (n - 1) * gap) / n
+        for k in range(n):
+            print(f'  <rect x="{f(x + pad + k * (sw_ + gap))}" y="{f(y + pad)}" width="{f(sw_)}" height="{f(h - 2 * pad)}" '
+                  f'rx="2.5" fill="{slab}" stroke="{args.stroke}" stroke-width="0.8"/>')
+    else:                   # horizontal slabs stacked top to bottom
+        sh = (h - 2 * pad - (n - 1) * gap) / n
+        for k in range(n):
+            print(f'  <rect x="{f(x + pad)}" y="{f(y + pad + k * (sh + gap))}" width="{f(w - 2 * pad)}" height="{f(sh)}" '
+                  f'rx="2.5" fill="{slab}" stroke="{args.stroke}" stroke-width="0.8"/>')
+    print("</g>")
+    print(f"<!-- ports: left {pt((x, y + h / 2))}, right {pt((x + w, y + h / 2))}, top {pt((x + w / 2, y))}, "
+          f"bottom {pt((x + w / 2, y + h))}; badge centre {pt((x + w - 2, y + 2))}; "
+          f"name below: text-anchor=middle x={f(x + w / 2)} y={f(y + h + 16)} -->")
+
+
+def cmd_vector(args):
+    """Feature / embedding vector: a bar split into cells, optionally shaded like values."""
+    x, y, w, h, n = args.x, args.y, args.w, args.h, args.cells
+    rnd = random.Random(args.seed)
+    vertical = not args.horizontal
+    step = (h if vertical else w) / n
+    print(f'<g class="vector">')
+    print(f'  <rect x="{f(x)}" y="{f(y)}" width="{f(w)}" height="{f(h)}" rx="1.5" fill="#FFFFFF"/>')
+    if args.shade:
+        for k in range(n):
+            op = 0.15 + 0.7 * rnd.random()
+            cx, cy = (x, y + k * step) if vertical else (x + k * step, y)
+            cw, ch = (w, step) if vertical else (step, h)
+            print(f'  <rect x="{f(cx)}" y="{f(cy)}" width="{f(cw)}" height="{f(ch)}" fill="{args.fill}" fill-opacity="{op:.2f}"/>')
+    else:
+        print(f'  <rect x="{f(x)}" y="{f(y)}" width="{f(w)}" height="{f(h)}" rx="1.5" fill="{_mix(args.fill, "#FFFFFF", 0.82)}"/>')
+    lines = []
+    for k in range(1, n):
+        if vertical:
+            lines.append(f"M{f(x)} {f(y + k * step)}H{f(x + w)}")
+        else:
+            lines.append(f"M{f(x + k * step)} {f(y)}V{f(y + h)}")
+    print(f'  <path d="{"".join(lines)}" stroke="{args.stroke}" stroke-width="0.8" fill="none"/>')
+    print(f'  <rect x="{f(x)}" y="{f(y)}" width="{f(w)}" height="{f(h)}" rx="1.5" fill="none" stroke="{args.stroke}" stroke-width="1.1"/>')
+    print("</g>")
+    print(f"<!-- ports: left {pt((x, y + h / 2))}, right {pt((x + w, y + h / 2))}; name below: text-anchor=middle "
+          f"x={f(x + w / 2)} y={f(y + h + 16)} -->")
+
+
 SEG_COLORS = ["#9EC1E3", "#F2C18F", "#A8D5BF", "#D9B8DE", "#E8D99A"]
 
 
@@ -466,6 +520,29 @@ def main(argv=None):
     sp.add_argument("--fill", default="#E4EEF8")
     sp.add_argument("--stroke", default="#8DB0D6")
     sp.set_defaults(fn=cmd_cuboid)
+
+    sp = sub.add_parser("layers", help="pretrained/frozen model as a block of stacked layers")
+    for k in ("x", "y", "w", "h"):
+        sp.add_argument(k, type=float)
+    sp.add_argument("--n", type=int, default=4, help="number of layer slabs (default 4)")
+    sp.add_argument("--flow", choices=["lr", "tb"], default="lr", help="lr: vertical slabs side by side; tb: horizontal slabs")
+    sp.add_argument("--pad", type=float, default=7.0)
+    sp.add_argument("--gap", type=float, default=4.0)
+    sp.add_argument("--r", type=float, default=7.0)
+    sp.add_argument("--fill", default="#E4EEF8")
+    sp.add_argument("--stroke", default="#8DB0D6")
+    sp.set_defaults(fn=cmd_layers)
+
+    sp = sub.add_parser("vector", help="feature vector: bar split into cells")
+    for k in ("x", "y", "w", "h"):
+        sp.add_argument(k, type=float)
+    sp.add_argument("--cells", type=int, default=6)
+    sp.add_argument("--horizontal", action="store_true", help="row vector (cells left to right)")
+    sp.add_argument("--shade", action="store_true", help="shade cells like values")
+    sp.add_argument("--seed", type=int, default=0)
+    sp.add_argument("--fill", default="#3A6A9E")
+    sp.add_argument("--stroke", default="#8DB0D6")
+    sp.set_defaults(fn=cmd_vector)
 
     sp = sub.add_parser("grid", help="mini cell grid visualisation")
     for k in ("x", "y", "w", "h"):
