@@ -1,5 +1,8 @@
 # Verification run: `ml-paper-figure` applied to a hypothetical UAM paper
 
+> This record predates LaTeX math typesetting and the component-shape lint. The maintained example is
+> `skills/ml-paper-figure/assets/example-figure1.svg`.
+
 The input is `methods.md` (frozen ViT encoder → proposed Uncertainty-Aware Module → decoder, with dashed loss paths).
 The target is NeurIPS `\textwidth` (5.5in = 396pt), on an 800 × 290u canvas.
 

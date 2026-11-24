@@ -35,7 +35,8 @@ lint needs Chromium. Without it the checks are approximate, so lean harder on th
    - stages (2–4 groups that become cards (a), (b), (c)), and the modules inside each;
    - which module(s) are the paper's **contribution** (gets the accent colour), which are **frozen/pretrained**, which are **trainable**;
    - tensors on the main path with shapes, e.g. `(B, 3, H, W) → (B, N, D)`, using the paper's own symbols;
-   - flows: forward data (solid), losses/supervision (dashed), gradients/feedback, skip connections, inference-only vs training-only paths.
+   - flows: forward data (solid), losses/supervision (dashed), gradients/feedback, skip connections, inference-only vs training-only paths;
+   - the conventional shape of each component (`design-system.md` §6): a pretrained model is a layer stack or trapezoid, a head a small trapezoid with its function, a feature vector a segmented bar, input views a thumbnail grid. Model components are never plain text boxes.
    From code: `__init__` lists modules, `forward()` gives the order and shapes, `requires_grad_(False)`/`.eval()`/`torch.no_grad()` mark frozen parts, and loss terms come from the training step.
    If the source does not say what is novel or what is frozen, ask one short question. Otherwise proceed with reasonable assumptions and state them.
 2. **Fix the canvas**: target venue and width, and `viewBox` from the table in `design-system.md` §2. The default is 2 units per printed pt, e.g. NeurIPS `800 × ~300`.
@@ -63,7 +64,7 @@ legend: [forward, loss, frozen, trainable]                    # only encodings t
 notes: "proposed card ~45% of width; spine at y = 140"
 ```
 
-Blueprint checks before moving on: every module has a box; boxes inside a card leave ≥ 14u card padding; neighbours that an arrow joins are ≥ 28u apart (≥ 40u if the arrow carries a label); label widths fit their boxes (`svg_geom.py label …` reports padding); and the spine (main path) is one straight line where possible.
+Blueprint checks before moving on: every module has a box and its conventional shape; boxes inside a card leave ≥ 14u card padding; neighbours that an arrow joins are ≥ 28u apart (≥ 40u if the arrow carries a label); label widths fit their boxes (`svg_geom.py label …` reports padding); box labels are names of ≤ 3 words and ≤ 2 lines, with any description moved to the caption; every symbol is defined in the caption or earlier text; and the spine (main path) is one straight line where possible.
 
 ## Phase 2: Draft (one self-contained SVG)
 
@@ -93,8 +94,10 @@ Each round:
    - [ ] **Arrows**: none pass through a module or label; arrowheads touch target borders (no gap, no piercing); no avoidable crossings; flow direction is obvious.
    - [ ] **Spacing & alignment**: equal gaps between siblings, rows share centre lines, same-type boxes share sizes, card padding is uniform, and no corner is crowded while another sits empty.
    - [ ] **Print legibility** (`preview.png`): smallest text still readable; script reports min ≥ 6pt at the target width; strokes visible; roles distinguishable.
-   - [ ] **Hierarchy**: the proposed module is the first thing the eye lands on; stage titles (a)/(b)/(c) are scannable; one accent colour.
-   - [ ] **Semantics**: every blueprint module and edge is present and correct; solid = forward, dashed = loss; badges and legend match what is drawn; notation matches the paper.
+   - [ ] **Hierarchy**: the proposed module is the first thing the eye lands on, and its name is bold in the figure; stage titles (a)/(b)/(c) are scannable; one accent colour.
+   - [ ] **Component shapes**: pretrained models, heads and feature vectors use their conventional shapes, not text boxes; input blocks show their content as a picture, not a sentence.
+   - [ ] **Semantics**: every blueprint module and edge is present and correct; solid = forward, dashed = loss; badges and legend match what is drawn.
+   - [ ] **Notation**: every symbol is defined in the caption or earlier text; each entity has one name across figure, caption and text; sub/superscripts match the body (italic vs upright).
 4. Fix, then re-render. Stop when there are **0 errors** and every checklist item passes, or a remaining warning is a deliberate choice you can justify (say which, and why). Lint warnings are hints, not verdicts: a warning you have inspected and judged fine needs no change.
 
 After round 3, stop iterating even if minor issues remain, and list them in the report.
@@ -105,7 +108,7 @@ After round 3, stop iterating even if minor issues remain, and list them in the 
 python3 "$SKILL_DIR/scripts/render_svg.py" <name>.svg --target <venue> --export
 ```
 
-This produces `<name>.pdf` (vector, page size equals the printed width, so its text sizes are the real printed sizes), a high-res `<name>.png` (3 px/u, or `--dpi 300`), and PDF checks: single page, fonts embedded, only Type 1 / TrueType fonts (Type 3 is an error), no rasterised content, and the PDF matching the PNG. If the renderer would embed Type 3 fonts for the sans text (Chromium does this for CFF fonts such as Inter `.otf` or TeX Gyre `.otf`, and NeurIPS/ICML-style checkers reject them), that text is converted to vector outlines automatically (`--pdf-text auto|fonts|outline`). `$…$` math is stamped in afterwards from pdflatex output, so the PDF carries the real Type 1 math fonts (e.g. CMMI6 with CMMI5 scripts); the report lists the fonts and their printed sizes. It also removes the review images. Then give the user:
+This produces `<name>.pdf` (vector, page size equals the printed width, so its text sizes are the real printed sizes), a high-res `<name>.png` (3 px/u, or `--dpi 300`), and PDF checks: single page, fonts embedded, only Type 1 / TrueType fonts (Type 3 is an error), no rasterised content, and the PDF matching the PNG. If the renderer would embed Type 3 fonts for the sans text (Chromium does this for CFF fonts such as Inter `.otf` or TeX Gyre `.otf`, and NeurIPS/ICML-style checkers reject them), that text is converted to vector outlines automatically (`--pdf-text auto|fonts|outline`; needs pdftocairo or PyMuPDF). To keep real fonts, pass TrueType versions of the figure fonts with `--font-dir` (svg-primitives.md §9). `$…$` math is stamped in afterwards from pdflatex output, so the PDF carries the real Type 1 math fonts (e.g. CMMI6 with CMMI5 scripts); the report lists the fonts and their printed sizes. It also removes the review images. Then give the user:
 
 - the files (`.svg` source, `.pdf` for LaTeX, `.png` for slides/preview);
 - a LaTeX snippet matching the target width:

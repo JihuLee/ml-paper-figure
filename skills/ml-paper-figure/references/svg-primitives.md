@@ -27,7 +27,7 @@ units (u) on the 2u = 1pt scale from `design-system.md`. When a formula needs ar
 | `class="edge"` + `fill="none"` on every connector | marks it for arrow checks; a missing `fill="none"` renders a black wedge (lint error `edge-filled`) |
 | `class="badge"` on badge `<use>` | excluded from alignment checks |
 | `class="legend"` on the legend group | legend line samples skip arrow-target checks |
-| `class="stack"` / `class="cuboid"` on 3D groups | excluded from alignment checks |
+| `class="stack"` / `class="cuboid"` / `class="layers"` / `class="vector"` on composite shapes | excluded from alignment checks |
 | `class="on-edge"` on a label and its white halo that sit on a line | excused from edge-crosses-label checks |
 | `data-lint="ignore"` | skip this subtree entirely (mini visualisations made of many cells) |
 
@@ -49,6 +49,7 @@ attributes on each `<text>`. (A CSS `fill` in a class would silently override th
       .t-mod   { font-size: 15px; font-weight: 600; }
       .t-sub   { font-size: 13px; font-weight: 400; }
       .t-dim   { font-size: 13px; font-weight: 400; }
+      .t-ours  { font-weight: 700; }   /* proposed method's name, in the figure only */
     </style>
     <marker id="ah-data" viewBox="0 0 10 8" refX="7.5" refY="4" markerWidth="8" markerHeight="6.4" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0L10 4L0 8L2.5 4Z" fill="#4B5768"/></marker>
     <marker id="ah-frozen" viewBox="0 0 10 8" refX="7.5" refY="4" markerWidth="8" markerHeight="6.4" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0L10 4L0 8L2.5 4Z" fill="#3A6A9E"/></marker>
@@ -152,9 +153,14 @@ Rules:
 <rect id="card-a" x="12" y="12" width="200" height="250" rx="10" fill="#F7F8FA" stroke="#E2E6EC" stroke-width="1"/>
 <text class="t-stage" x="26" y="37" fill="#1F2933">(a) Frozen Encoder</text>
 
-<!-- module (role = frozen); proposed modules use stroke-width 1.6 -->
-<rect id="head" x="300" y="92" width="96" height="36" rx="7" fill="#E4EEF8" stroke="#8DB0D6" stroke-width="1.2"/>
-<text class="t-mod" x="348" y="115.25" text-anchor="middle" fill="#1F2933">Mean Head</text>
+<!-- generic operation without a conventional shape (fusion, pooling, sampling): rounded rect + name.
+     Model components (pretrained models, heads, feature vectors) use their shapes from §5 instead. -->
+<rect id="fuse" x="300" y="92" width="96" height="36" rx="7" fill="#E3F2ED" stroke="#86C0AA" stroke-width="1.2"/>
+<text class="t-mod" x="348" y="115.25" text-anchor="middle" fill="#1F2933">Fusion</text>
+
+<!-- the proposed method's own box: accent palette, 1.6 stroke, name in bold (t-ours), once per figure -->
+<rect id="ours" x="590" y="164" width="88" height="44" rx="7" fill="#FDEBDC" stroke="#E79A5D" stroke-width="1.6"/>
+<text class="t-mod t-ours" x="634" y="191.25" text-anchor="middle" fill="#1F2933">Ours</text>
 
 <!-- dims chip (pill): rx = h/2 -->
 <rect x="470" y="174" width="96" height="24" rx="12" fill="#EEF1F5" stroke="#A3AEBD" stroke-width="1"/>
@@ -164,7 +170,8 @@ Rules:
 <rect id="loss" x="380" y="392" width="56" height="30" rx="15" fill="#F9E6EA" stroke="#D9909F" stroke-width="1.2"/>
 ```
 
-Role fills, strokes and inks are listed in `design-system.md` §4.
+Role fills, strokes and inks are listed in `design-system.md` §4. Bold (`t-ours`) is a figure-only emphasis for the
+method's name; it does not change how the paper's text styles that name.
 
 ## 4. Connectors
 
@@ -273,11 +280,51 @@ For other counts, repeat `<rect width="8" height="8" rx="2">` every 11u.
 `<use xlink:href="#op-add" x="cx" y="cy"/>` (⊕), `#op-mul` (⊗), `#op-cat` (∥). These are r = 7 circles centred on (cx, cy).
 Connect to them like any box: their left border is at cx − 7.
 
+### 5.6 Layer stack (pretrained / frozen model: VLM, LLM, vision encoder)
+
+A block of 3–5 layer slabs that the data crosses in flow order, in the `frozen` palette with a frozen badge. Put the
+name under the block (T2, `y = bottom + 16`) or inside a wide block above the slabs.
+
+```xml
+<g class="layers">   <!-- svg_geom.py layers 400 560 52 64 --n 4 --pad 6 --gap 3 -->
+  <rect x="400" y="560" width="52" height="64" rx="7" fill="#E4EEF8" stroke="#8DB0D6" stroke-width="1.2"/>
+  <rect x="406" y="566" width="7.75" height="52" rx="2.5" fill="#BDD2E9" stroke="#8DB0D6" stroke-width="0.8"/>
+  <rect x="416.75" y="566" width="7.75" height="52" rx="2.5" fill="#BDD2E9" stroke="#8DB0D6" stroke-width="0.8"/>
+  <rect x="427.5" y="566" width="7.75" height="52" rx="2.5" fill="#BDD2E9" stroke="#8DB0D6" stroke-width="0.8"/>
+  <rect x="438.25" y="566" width="7.75" height="52" rx="2.5" fill="#BDD2E9" stroke="#8DB0D6" stroke-width="0.8"/>
+</g>
+<use class="badge" xlink:href="#badge-frozen" x="450" y="562"/>
+```
+
+`--flow tb` gives horizontal slabs for top-to-bottom figures.
+
+### 5.7 Feature vector
+
+A bar split into 6–8 cells, vertical in left-to-right figures; `--shade` fills the cells like values. Label it with
+its symbol under the bar (`$f$`).
+
+```bash
+python3 "$SKILL_DIR/scripts/svg_geom.py" vector 480 564 12 56 --cells 6 --shade --seed 5 --fill "#3A6A9E"
+```
+
+### 5.8 Small trainable head (linear, logistic, MLP, classifier, probe)
+
+A small trapezoid narrowing toward its output, with the head's function inside: the `glyph-sigmoid` curve (§6) or the
+symbol as LaTeX (`$\sigma$`, `$\mathrm{softmax}$`). Name it under the shape when the name matters.
+
+```xml
+<!-- svg_geom.py trapezoid 520 568 36 48 --inset 8 --r 3 --fill "#E3F2ED" --stroke "#86C0AA" -->
+<path d="M 520 571 Q 520 568 522.93 568.65 L 553.07 575.35 Q 556 576 556 579 L 556 605 Q 556 608 553.07 608.65 L 522.93 615.35 Q 520 616 520 613 Z" fill="#E3F2ED" stroke="#86C0AA" stroke-width="1.2"/>
+<use xlink:href="#glyph-sigmoid" x="537" y="592"/>
+<use class="badge" xlink:href="#badge-train" x="554" y="578"/>
+```
+
 ## 6. Mini visualisations (optional `<defs>`)
 
 Paste only the ones you use into `<defs>`. Place with `<use xlink:href="#thumb-…" x="left" y="top"/>`. Scale with
 `transform="translate(x,y) scale(s)"` and no x/y. Sizes: images 40×40; noise/heat/attention 36×36 plus a 1.5u frame;
-bell 32×14; tokens 52×8. Make variants with `svg_geom.py grid … --mode noise|heat|attn|seg|patch --seed N`
+bell 32×14; tokens 52×8; augmented views 40×40 (2×2: original, flipped, colour-jittered, masked); sigmoid
+glyph 16×10 centred on (x, y). Make variants with `svg_geom.py grid … --mode noise|heat|attn|seg|patch --seed N`
 (compact output, one path per opacity level).
 
 ```xml
@@ -335,6 +382,15 @@ bell 32×14; tokens 52×8. Make variants with `svg_geom.py grid … --mode noise
   <g id="tok-row">
     <rect width="8" height="8" rx="2" fill="#E4EEF8" stroke="#8DB0D6"/><rect x="11" width="8" height="8" rx="2" fill="#E4EEF8" stroke="#8DB0D6"/><rect x="22" width="8" height="8" rx="2" fill="#E4EEF8" stroke="#8DB0D6"/><rect x="33" width="8" height="8" rx="2" fill="#E4EEF8" stroke="#8DB0D6"/><rect x="44" width="8" height="8" rx="2" fill="#FDEBDC" stroke="#E79A5D"/>
   </g>
+  <g id="glyph-sigmoid"><path d="M-8 5C0 5 0 -5 8 -5" fill="none" stroke="#4B5768" stroke-width="1.4" stroke-linecap="round"/></g>
+  <g id="thumb-views">   <!-- needs thumb-image -->
+    <use xlink:href="#thumb-image" transform="scale(0.475)"/>
+    <use xlink:href="#thumb-image" transform="translate(40 0) scale(-0.475 0.475)"/>
+    <use xlink:href="#thumb-image" transform="translate(0 21) scale(0.475)"/>
+    <rect x="0" y="21" width="19" height="19" rx="1.4" fill="#F2C46D" fill-opacity="0.35"/>
+    <use xlink:href="#thumb-image" transform="translate(21 21) scale(0.475)"/>
+    <rect x="27.5" y="27.5" width="7" height="7" fill="#6B7280" fill-opacity="0.6"/>
+  </g>
 </defs>
 ```
 
@@ -387,6 +443,19 @@ Avoid these, which the lint warns about: `filter` (drop shadows rasterise in PDF
 `alignment-baseline`, `textLength`, `context-stroke`, `orient="auto-start-reverse"`, CSS `var(--x)`, `<foreignObject>`,
 `@import`/`@font-face`, external `href`s, emoji. Use `clip-path` only when unavoidable.
 
+### Fonts in the exported PDF
+
+- Chromium embeds TrueType fonts as TrueType but CFF-flavoured OpenType fonts (`.otf`: Inter from many distributions,
+  TeX Gyre, Latin Modern) as **Type 3**, which camera-ready checkers reject. `--export` then outlines the text
+  (`pdftocairo`, or PyMuPDF when poppler is missing); if neither is available it reports `pdf-outline-unavailable`.
+- To keep real, selectable fonts instead, convert the figure fonts to TrueType (fontTools' `otf2ttf` snippet,
+  `Snippets/otf2ttf.py` in the fontTools repository) into a folder and render with `--font-dir <folder>`. Family names
+  stay the same, so the SVG needs no change; the CFF copies of those families are hidden from the renderer for that run.
+  Check the result with `pdffonts`: every font should be `TrueType` or `Type 1`.
+- A character missing from the figure font (Inter has no `∗` U+2217, `⊙` or `∇`) is drawn in a fallback font with a
+  different design, and a CFF fallback adds Type 3 fonts. The lint reports it as `glyph-fallback`. Write the symbol as
+  `$…$` math, or give that `<tspan>` a `font-family` that has the glyph.
+
 ## 10. `svg_geom.py` cheat-sheet
 
 ```bash
@@ -397,8 +466,10 @@ python3 $G trapezoid 100 98 88 100 --inset 20 --kind encoder                    
 python3 $G trapezoid 600 110 76 80 --inset 16 --kind decoder --fill "#E3F2ED" --stroke "#86C0AA"
 python3 $G stack 250 164 30 44 --n 3 --dx 5 --dy 5
 python3 $G cuboid 330 164 28 44 --depth 10 --fill "#FDEBDC" --stroke "#E79A5D"
+python3 $G layers 400 560 52 64 --n 4 --pad 6 --gap 3                                # pretrained model (layer stack)
+python3 $G vector 480 564 12 56 --cells 6 --shade --fill "#3A6A9E"                    # feature vector
 python3 $G grid 0 0 36 36 --rows 6 --cols 6 --gap 0.8 --mode heat --seed 2 --color "#D9772F"
 python3 $G bell 384 298 32 14
-python3 $G label 300 92 96 36 "Mean Head" --fs 15 --cls t-mod                        # prints <text> + padding check
+python3 $G label 300 92 96 36 "Fusion" --fs 15 --cls t-mod                           # prints <text> + padding check
 python3 $G width "(b) Uncertainty-Aware Module" --fs 17 --weight 600                 # → 250.7
 ```

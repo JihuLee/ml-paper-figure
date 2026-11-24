@@ -10,7 +10,7 @@ legible flow, nothing decorative.
 3. Layout & containers
 4. Colour palette
 5. Typography
-6. Shapes & ML metaphors
+6. Shapes & ML conventions
 7. Connectors
 8. Badges, legend, annotations
 9. Information density
@@ -123,18 +123,36 @@ widths stays safe.
 - **Module names** are nouns in Title Case, ≤ 2 lines, ~14 characters per line (`Vision Encoder`, `Cross-Attn`). Use exactly the paper's names.
 - **Tensor shapes** take the form `(B, C, H, W)`, with comma + space; use `×` (U+00D7) for products such as `H/16×W/16`. Show them at stage boundaries and wherever the shape changes, not on every edge.
 - **Symbols** follow the paper's notation exactly, as LaTeX in `$…$`: `$x$`, `$\hat{y}$`, `$\mathcal{L}_{\text{task}}$`, `$c_{FA}$`. Render with `--paper main.tex` so the paper's macros and math font are used. Math in a line counts toward the size of that line's tier, not as an extra tier.
+- **Emphasis inside the figure.** Set the proposed method's name in bold (`class="t-mod t-ours"`, weight 700) where it
+  names the method's box, panel or column, once per figure. This is a figure-only device that gives the eye its
+  target; it does not change how the paper's text styles the name.
+- **Notation contract with the paper.**
+  - Every symbol in the figure is defined in the caption or in text before the figure.
+  - One name per entity: a module is not "encoder" in the figure and "backbone" in the caption.
+  - Same notation as the body, including upright vs italic subscripts (`c_{\text{FA}}` vs `c_{FA}`). Copy it from the
+    paper instead of retyping it.
+- **Glyph coverage.** A character the figure font lacks (Inter has no `∗` U+2217, `⊙` or `∇`) is drawn in a fallback
+  font with a different design; the lint reports `glyph-fallback`. Write such symbols as `$…$` math, or give that
+  `<tspan>` a font that has them.
 - Line height is 1.25 × size. Avoid all-caps, underline and italics for emphasis.
 
-## 6. Shapes & ML metaphors
+## 6. Shapes & ML conventions
 
-Use a metaphor only where it carries meaning; 1–3 metaphors plus rounded rectangles is the sweet spot.
+Readers of ML papers recognise components by shape before they read labels. Draw each **model component** with its
+conventional shape: a pretrained model, a head or a feature vector shown as a plain text box reads as a placeholder,
+and the lint flags it (`plain-component`). Keep plain rounded rectangles for generic operations that have no
+convention (fusion, pooling, sampling), and use an operator symbol when the step is one. Beyond that, 1–3 metaphors
+per figure is the sweet spot.
 
-| Concept | Shape (template in svg-primitives.md) |
+| Component | Conventional shape (template in svg-primitives.md) |
 |---|---|
-| generic layer / module | rounded rect, `rx` 6–8 |
+| generic operation (fusion, pooling, sampling) | rounded rect, `rx` 6–8 |
+| pretrained / frozen large model (VLM, LLM, vision encoder) | layer stack: block of 3–5 slabs crossing the flow (§5.6), or an encoder trapezoid, + frozen badge |
 | encoder (compresses) | trapezoid, wide side toward the input |
 | decoder / upsampler / generator | inverted trapezoid, wide side toward the output |
-| big pretrained backbone | trapezoid or tall rect + frozen badge |
+| small trainable head (linear, logistic, MLP, classifier, probe) | small trapezoid narrowing to its output, with its function inside: sigmoid glyph, `$\sigma$`, `$\mathrm{softmax}$` (§5.8) |
+| feature / embedding vector | bar split into 6–8 cells, optionally shaded like values (§5.7) |
+| input views / augmentations | 2×2 grid of small thumbnails showing each transform (flip, colour, mask); 1–2 word label |
 | feature map / latent tensor | isometric cuboid, or a 3-card stack |
 | multi-head, ensemble, ×N layers | 3-card stack + `×N` tag |
 | token sequence / embeddings | row of small rounded squares |
@@ -175,7 +193,11 @@ Use a metaphor only where it carries meaning; 1–3 metaphors plus rounded recta
 ## 9. Information density
 
 - Budget for a full-width Figure 1: ≤ ~12 modules, ≤ ~15 edges, ≤ ~40 text items. Anything beyond belongs in a later figure or an inset.
-- Labels are names, not sentences (≤ 3 words). Explanations go in the caption.
+- **Labels are names, not sentences**: ≤ 3 words and ≤ 2 lines per box. The lint warns when one box holds more than 8
+  words or 3 lines (`verbose-label`).
+- **Show, don't describe.** Input and preprocessing blocks are where sentences creep in ("resize to 224×224, normalise
+  and split into 16×16 patches"). Draw the result instead (patch grid, views grid) with a 1–2 word label, and put the
+  description in the caption.
 - Every symbol and shape must come from the paper or code. If you had to assume something, say so in the report.
 
 ## 10. Adapting the defaults
@@ -193,4 +215,5 @@ Use a metaphor only where it carries meaning; 1–3 metaphors plus rounded recta
 - Arrows through modules, diagonal spaghetti, arrowheads floating short of or piercing their target.
 - Emoji or Unicode pictographs as icons, which render as bitmaps or tofu in camera-ready PDFs.
 - Sentences inside the figure; every module a different colour; boxes misaligned by 1–3u.
+- Model components as text boxes: an "LLM" or "Linear Head" rectangle instead of a layer stack or a small head shape.
 - Raster screenshots pasted into a vector schematic. Use vector thumbnails; if real images are essential, use small, clean crops.
