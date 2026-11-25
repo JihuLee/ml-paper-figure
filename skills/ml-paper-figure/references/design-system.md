@@ -122,14 +122,14 @@ widths stays safe.
 - At most 4 sizes per figure (3 is typical). Captions print at ~9pt, so figure text stays at or below that. On an 800u NeurIPS canvas 1u = 0.495pt, so 12u would print at 5.9pt; hence the 12.5u floor.
 - **Module names** are nouns in Title Case, ≤ 2 lines, ~14 characters per line (`Vision Encoder`, `Cross-Attn`). Use exactly the paper's names.
 - **Tensor shapes** take the form `(B, C, H, W)`, with comma + space; use `×` (U+00D7) for products such as `H/16×W/16`. Show them at stage boundaries and wherever the shape changes, not on every edge.
-- **Symbols** follow the paper's notation exactly, as LaTeX in `$…$`: `$x$`, `$\hat{y}$`, `$\mathcal{L}_{\text{task}}$`, `$c_{FA}$`. Render with `--paper main.tex` so the paper's macros and math font are used. Math in a line counts toward the size of that line's tier, not as an extra tier.
+- **Symbols** follow the paper's notation exactly, as LaTeX in `$…$`: `$x$`, `$\hat{y}$`, `$\mathcal{L}_{\text{task}}$`, `$w_{ij}$`. Render with `--paper main.tex` so the paper's macros and math font are used. Math in a line counts toward the size of that line's tier, not as an extra tier.
 - **Emphasis inside the figure.** Set the proposed method's name in bold (`class="t-mod t-ours"`, weight 700) where it
   names the method's box, panel or column, once per figure. This is a figure-only device that gives the eye its
   target; it does not change how the paper's text styles the name.
 - **Notation contract with the paper.**
   - Every symbol in the figure is defined in the caption or in text before the figure.
   - One name per entity: a module is not "encoder" in the figure and "backbone" in the caption.
-  - Same notation as the body, including upright vs italic subscripts (`c_{\text{FA}}` vs `c_{FA}`). Copy it from the
+  - Same notation as the body, including upright vs italic subscripts (`\lambda_{\text{KL}}` vs `\lambda_{KL}`). Copy it from the
     paper instead of retyping it.
 - **Glyph coverage.** A character the figure font lacks (Inter has no `∗` U+2217, `⊙` or `∇`) is drawn in a fallback
   font with a different design; the lint reports `glyph-fallback`. Write such symbols as `$…$` math, or give that

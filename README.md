@@ -54,7 +54,7 @@ smallest printed font size and any accepted warnings.
    target venue) and every module's box before drawing.
 2. **Draft.** Write one self-contained SVG from tested primitives: role-colored arrowheads, vector frozen/trainable
    badges, trapezoids, stacks and mini visualizations. `svg_geom.py` computes the exact paths. Math is written as
-   LaTeX between `$…$` (`scores $S[i,v,p]$`) and typeset by LaTeX in the paper's math font and macros.
+   LaTeX between `$…$` (`weights $w_{ij}$`) and typeset by LaTeX in the paper's math font and macros.
 3. **Render & critique.** `render_svg.py` lints the geometry (overflowing text, arrows through boxes, floating
    arrowheads, near-misalignment, font size in printed pt, math script sizes) and writes a debug overlay and a
    printed-size preview for the agent to inspect. At most three rounds.
@@ -116,6 +116,10 @@ replace CFF fonts of the same family); the `glyph-fallback`, `verbose-label` and
 with TinyTeX (latex, pdflatex, dvisvgm 3.6) and PyMuPDF; install and update with `npx skills`. Implemented but not yet
 tested: the rsvg-convert, Inkscape, cairosvg and resvg backends, the PyMuPDF fallback that builds the SVG glyphs
 without dvisvgm, and the PyMuPDF outliner used when pdftocairo is missing.
+
+## License
+
+[MIT](LICENSE) © 2026 Jihu Lee
 
 <sub>Architecture diagram made with stack-diagram (source: <a href="docs/architecture.html">docs/architecture.html</a>).
 Icons: devicon and Lucide.</sub>

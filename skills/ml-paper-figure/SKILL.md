@@ -1,5 +1,6 @@
 ---
 name: ml-paper-figure
+license: MIT
 description: 'Design publication-ready Figure 1 diagrams for ML/AI papers (NeurIPS, ICML, ICLR, CVPR, ECCV, ACL, AAAI): framework overviews, model-architecture schematics, method/pipeline and teaser figures. Produces one self-contained SVG plus a vector PDF for LaTeX \includegraphics and a high-res PNG, using a render-and-critique loop with an offline lint script. Use this skill whenever the user wants to draw, redesign or polish an overview/architecture/pipeline/method figure for a paper, poster or rebuttal, or hands over a Methods section, LaTeX/Markdown text or PyTorch model code and wants it turned into a diagram — even if they only say "make Figure 1", "draw my model" or "visualize this architecture", in any language. Not for plots of experimental results (bar/line charts, tables) or cloud-infrastructure diagrams.'
 ---
 
@@ -27,7 +28,7 @@ lint needs Chromium. Without it the checks are approximate, so lean harder on th
 | `assets/primitives-gallery.png` | Optional. A rendered view of every primitive, useful for picking metaphors. |
 | `assets/example-figure1.svg` (+ `.png`) | Optional. A complete, lint-clean Figure 1 (frozen encoder → proposed module → decoder + dashed losses) to copy structure from. |
 | `scripts/svg_geom.py` | Use it any time you need exact coordinates. It prints connector paths, trapezoids, stacks, grids and centred labels with a fit check. |
-| `scripts/tex_math.py` | Used by `render_svg.py` for `$…$` math. Run `--paper main.tex --show` to see the math setup and macros taken from the paper, `--test 'c_{FA}' --pt 6` to typeset one snippet. |
+| `scripts/tex_math.py` | Used by `render_svg.py` for `$…$` math. Run `--paper main.tex --show` to see the math setup and macros taken from the paper, `--test 'w_{ij}' --pt 6` to typeset one snippet. |
 
 ## Phase 1: Plan (blueprint before any SVG)
 
@@ -75,7 +76,7 @@ Read `references/svg-primitives.md`, then write `<name>.svg`:
 - Draw order: background → cards → edges → modules → labels → badges → legend. Edges sit under modules so their ends tuck under borders.
 - Give modules ids (`id="enc"`), connectors `class="edge"` and `fill="none"`, and mini visuals `data-lint="ignore"`. Lint messages then name elements you can find.
 - Compute coordinates with the formulas or `svg_geom.py`, not by eye. Text centre baseline is `cy + 0.35 × font-size`. Paths end **2u before** the target border, since the standard arrowhead tip overshoots by 2u.
-- **Math is LaTeX**: write symbols between `$…$` inside a `<text>` (`scores $S[i,v,p]$`, `$\mathcal{L}_{\text{KL}}$`) in the paper's notation. The render script typesets them in the paper's math font and macros (`--paper main.tex`) and writes the result into the SVG. Edit only the source `<text>`; never fake math with italic serif text or `<tspan dy>` subscripts (svg-primitives.md §2).
+- **Math is LaTeX**: write symbols between `$…$` inside a `<text>` (`weights $w_{ij}$`, `$\mathcal{L}_{\text{KL}}$`) in the paper's notation. The render script typesets them in the paper's math font and macros (`--paper main.tex`) and writes the result into the SVG. Edit only the source `<text>`; never fake math with italic serif text or `<tspan dy>` subscripts (svg-primitives.md §2).
 
 ## Phase 3: Render & critique (loop, max 3 rounds)
 
