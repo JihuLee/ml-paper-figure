@@ -11,7 +11,7 @@ Modes
   python render_svg.py --list-backends    show detected renderers
 
 Math
-  Write math as $...$ inside an ordinary single-line <text> (e.g. <text ...>scores $S[i,v,p]$</text>). Before each run
+  Write math as $...$ inside an ordinary single-line <text> (e.g. <text ...>weights $w_{ij}$</text>). Before each run
   the script typesets every $...$ segment with LaTeX (tex_math.py: latex -> dvisvgm glyph paths, in the paper's math
   setup with --paper main.tex or --math cm|newtx|...) and writes the result back into the SVG: the source <text> is
   kept, hidden, as data-tex="src", followed by a generated <g data-tex="out" class="tex-line"> holding the sans

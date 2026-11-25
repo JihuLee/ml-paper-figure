@@ -107,7 +107,7 @@ the dollars stays in the figure's sans font; `render_svg.py` typesets each math 
 
 ```xml
 <!-- mixed line: the sans words and the math share one baseline (y), placed and centred as one line -->
-<text class="t-sub" x="114" y="66" text-anchor="middle" fill="#4B5563">scores $S[i,v,p]$</text>
+<text class="t-sub" x="114" y="66" text-anchor="middle" fill="#4B5563">weights $w_{ij}$</text>
 <!-- loss in a pill centred at cy: the usual baseline y = cy + 0.35·fs; the lint measures the subscript's ink -->
 <text class="t-mod" x="408" y="412.25" text-anchor="middle" fill="#A84B61">$\mathcal{L}_{\text{task}}$</text>
 <!-- accents, Greek, operators: plain LaTeX, or the paper's macros when rendered with --paper -->
@@ -137,7 +137,7 @@ Rules:
   files and local `.sty`/`.cls` files, picks the math setup (Computer Modern unless the paper loads e.g.
   `newtxmath`/`mathptmx`; `\usepackage{times}` changes only the text font, so CVPR math stays Computer Modern),
   copies math packages such as `amsmath`, `bm`, and every `\newcommand`/`\DeclareMathOperator`. If the paper writes
-  `c_{FA}`, write `$c_{FA}$`, not `$c_{\mathrm{FA}}$`. The setup is stored in `<metadata id="tex-setup">`, so later
+  `\lambda_{KL}`, write `$\lambda_{KL}$`, not `$\lambda_{\mathrm{KL}}$`. The setup is stored in `<metadata id="tex-setup">`, so later
   runs reuse it. Override with `--math cm|newtx|mathptmx|newpx|...` or verbatim LaTeX; `python3 scripts/tex_math.py
   --paper main.tex --show` prints the preamble.
 - Never fake math: no serif-italic classes, `<tspan dy>` subscripts, smaller separate text for indices or Unicode

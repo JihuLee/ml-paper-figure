@@ -543,7 +543,7 @@ def _pdf_page_svg_body(pdf, i, met):
 
 
 def split_math(s):
-    r"""'scores $S[i,v,p]$' -> [('scores ', False), ('S[i,v,p]', True)]. \$ is a literal dollar sign."""
+    r"""'weights $w_{ij}$' -> [('weights ', False), ('w_{ij}', True)]. \$ is a literal dollar sign."""
     out, buf, i, inmath = [], "", 0, False
     while i < len(s):
         c = s[i]
@@ -632,7 +632,7 @@ def main(argv=None):
     ap.add_argument("--no-macros", action="store_true", help="do not copy the paper's macro definitions")
     ap.add_argument("--show", action="store_true", help="print the preamble snippets are compiled with")
     ap.add_argument("--check-env", action="store_true", help="list the TeX tools found")
-    ap.add_argument("--test", metavar="TEX", help="typeset one snippet (e.g. 'c_{FA}') and print its box")
+    ap.add_argument("--test", metavar="TEX", help="typeset one snippet (e.g. 'w_{ij}') and print its box")
     ap.add_argument("--pt", type=float, default=6.0, help="size for --test (default 6pt)")
     a = ap.parse_args(argv)
     if a.check_env or not (a.show or a.test):
